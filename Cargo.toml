@@ -1,6 +1,6 @@
 [package]
 name = "rust-launcher"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 authors = ["OpenUO Contributors"]
 license = "BSD-2-Clause"
@@ -31,4 +31,4 @@ hostname = "0.4"
 core-graphics = "0.23"
 
 [target.'cfg(target_os = "windows")'.dependencies]
-windows = { version = "0.58", features = ["Win32_Graphics_Gdi"] }
+windows = { version = "0.58", features = ["Win32_UI_WindowsAndMessaging"] }
