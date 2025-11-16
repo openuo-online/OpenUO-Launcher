@@ -51,6 +51,8 @@ pub struct GithubRelease {
     pub name: String,
     pub assets: Vec<GithubAsset>,
     pub body: Option<String>,
+    pub published_at: Option<String>,
+    pub target_commitish: Option<String>,
 }
 
 pub enum DownloadEvent {
@@ -106,9 +108,82 @@ pub fn download_and_unpack_open_uo_with_progress<F: Fn(DownloadEvent) + Send + '
     extract_zip(&tmp, &target_dir)?;
     fs::remove_file(&tmp).ok();
 
-    let version = release.name.clone();
+    // 使用发布时间作为版本标识
+    let version = get_version_string(&release);
     write_open_uo_version(&version, &target_dir)?;
     Ok(version)
+}
+
+pub fn download_launcher_update<F: Fn(DownloadEvent) + Send + 'static>(
+    progress: F,
+) -> Result<String> {
+    let progress_cb = |evt: DownloadEvent| {
+        progress(evt);
+    };
+
+    let release = fetch_latest_release(LAUNCHER_RELEASE_URL)?;
+    
+    // 根据当前平台选择正确的可执行文件
+    let launcher_name = get_launcher_asset_name();
+    let asset = release
+        .assets
+        .iter()
+        .find(|a| a.name == launcher_name)
+        .cloned()
+        .context(format!("未找到平台 {} 的 Launcher", launcher_name))?;
+
+    // 下载到临时文件
+    let tmp = std::env::temp_dir().join(&asset.name);
+    download_asset(&asset.browser_download_url, &tmp, |received, total| {
+        progress_cb(DownloadEvent::Progress { received, total });
+    })?;
+
+    // 获取当前可执行文件路径
+    let current_exe = std::env::current_exe()?;
+    let backup = current_exe.with_extension("old");
+    
+    // 备份当前版本
+    if current_exe.exists() {
+        fs::copy(&current_exe, &backup)?;
+    }
+    
+    // 替换为新版本
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let perms = fs::Permissions::from_mode(0o755);
+        fs::set_permissions(&tmp, perms)?;
+    }
+    
+    fs::copy(&tmp, &current_exe)?;
+    fs::remove_file(&tmp).ok();
+    
+    let version = get_version_string(&release);
+    Ok(version)
+}
+
+fn get_launcher_asset_name() -> String {
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    return "OpenUO-Launcher-macos-arm64".to_string();
+    
+    #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+    return "OpenUO-Launcher-macos-x64".to_string();
+    
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    return "OpenUO-Launcher-linux-x64".to_string();
+    
+    #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
+    return "OpenUO-Launcher-windows-x64.exe".to_string();
+    
+    #[cfg(not(any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "macos", target_arch = "x86_64"),
+        all(target_os = "linux", target_arch = "x86_64"),
+        all(target_os = "windows", target_arch = "x86_64")
+    )))]
+    {
+        panic!("不支持的平台");
+    }
 }
 
 fn download_asset(url: &str, dest: &PathBuf, progress: impl Fn(u64, u64)) -> Result<()> {
@@ -194,17 +269,43 @@ pub fn trigger_update_check_impl(open_uo: bool, launcher: bool) -> mpsc::Receive
     std::thread::spawn(move || {
         if open_uo {
             let res = fetch_latest_release(OPEN_UO_RELEASE_URL)
-                .map(|r| r.name)
+                .map(|r| get_version_string(&r))
                 .map_err(|e| format!("{e:#}"));
             let _ = tx.send(UpdateEvent::OpenUO(res));
         }
         if launcher {
             let res = fetch_latest_release(LAUNCHER_RELEASE_URL)
-                .map(|r| r.name)
+                .map(|r| get_version_string(&r))
                 .map_err(|e| format!("{e:#}"));
             let _ = tx.send(UpdateEvent::Launcher(res));
         }
         let _ = tx.send(UpdateEvent::Done);
     });
     rx
+}
+
+// 从 release 中提取版本字符串
+fn get_version_string(release: &GithubRelease) -> String {
+    // 如果是 latest 标签，使用发布时间作为版本标识
+    if release.tag_name == "latest" {
+        // 使用发布时间（格式：2024-11-16T12:34:56Z）
+        if let Some(published) = &release.published_at {
+            // 格式化为：2024-11-16 12:34
+            let formatted = published
+                .replace('T', " ")
+                .replace('Z', "")
+                .chars()
+                .take(16)
+                .collect::<String>();
+            return formatted;
+        }
+        // 备选：使用提交 SHA 的前 7 位
+        if let Some(commit) = &release.target_commitish {
+            if commit.len() >= 7 {
+                return format!("commit-{}", &commit[..7]);
+            }
+        }
+    }
+    // 对于正式版本标签（如 v1.0.0），直接使用 tag_name
+    release.tag_name.clone()
 }

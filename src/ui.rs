@@ -175,14 +175,31 @@ impl LauncherUi {
         egui::Frame::none().show(ui, |ui| {
             ui.set_min_width(ui.available_width());
             let launcher_remote = if self.checking_launcher {
-                "检查中..."
+                "检查中...".to_string()
             } else {
-                self.remote_launcher.as_deref().unwrap_or("检查失败")
+                self.remote_launcher.clone().unwrap_or_else(|| "检查失败".to_string())
             };
-            ui.label(format!(
-                "Launcher 本地: {}  远程: {}",
-                self.launcher_version, launcher_remote
-            ));
+            let launcher_version = self.launcher_version.clone();
+            let has_update = self.remote_launcher.as_ref()
+                .map(|r| r != &launcher_version && !self.checking_launcher)
+                .unwrap_or(false);
+            
+            ui.horizontal(|ui| {
+                ui.label(format!(
+                    "Launcher 本地: {}  远程: {}",
+                    launcher_version, launcher_remote
+                ));
+                
+                // 检查是否有新版本
+                if has_update {
+                    let update_btn = egui::Button::new("🔄 更新 Launcher")
+                        .fill(egui::Color32::from_rgba_unmultiplied(200, 100, 50, 200))
+                        .min_size(egui::vec2(100.0, 24.0));
+                    if ui.add(update_btn).clicked() {
+                        self.start_launcher_update();
+                    }
+                }
+            });
             ui.horizontal(|ui| {
                 let open_uo_text = self
                     .open_uo_version
@@ -275,6 +292,23 @@ impl LauncherUi {
         });
         self.download_rx = Some(rx);
         self.download_progress = None;
+    }
+
+    fn start_launcher_update(&mut self) {
+        if self.download_rx.is_some() {
+            return;
+        }
+        let (tx, rx) = mpsc::channel();
+        let tx_progress = tx.clone();
+        std::thread::spawn(move || {
+            let result = crate::github::download_launcher_update(move |evt| {
+                let _ = tx_progress.send(evt);
+            });
+            let _ = tx.send(DownloadEvent::Finished(result.map_err(|e| format!("{e:#}"))));
+        });
+        self.download_rx = Some(rx);
+        self.download_progress = None;
+        self.set_status("正在下载 Launcher 更新...");
     }
 
     fn trigger_update_checks(&mut self, open_uo: bool, launcher: bool) {
@@ -441,8 +475,15 @@ fn poll_download_channel(
                     *download_progress = None;
                     match result {
                         Ok(tag) => {
-                            *open_uo_version = Some(tag.clone());
-                            *status = format!("OpenUO 下载完成 {}", tag);
+                            // 判断是 OpenUO 还是 Launcher 更新
+                            if tag.contains("Launcher") || tag.starts_with("20") {
+                                // Launcher 更新完成，提示重启
+                                *status = format!("✅ Launcher 更新完成！请重启程序以使用新版本。");
+                            } else {
+                                // OpenUO 下载完成
+                                *open_uo_version = Some(tag.clone());
+                                *status = format!("OpenUO 下载完成 {}", tag);
+                            }
                         }
                         Err(err) => {
                             *status = format!("下载失败: {err}");
