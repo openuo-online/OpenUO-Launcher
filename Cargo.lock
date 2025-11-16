@@ -2186,6 +2186,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "openuo-launcher"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "core-graphics",
+ "egui",
+ "egui-wgpu",
+ "egui-winit",
+ "hostname",
+ "image",
+ "pollster",
+ "reqwest",
+ "rfd",
+ "self-replace",
+ "serde",
+ "serde_json",
+ "time",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+ "wgpu",
+ "windows 0.58.0",
+ "winit",
+ "zip",
+]
+
+[[package]]
 name = "orbclient"
 version = "0.3.49"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2563,34 +2591,6 @@ dependencies = [
  "libc",
  "untrusted",
  "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "openuo-launcher"
-version = "0.1.1"
-dependencies = [
- "anyhow",
- "core-graphics",
- "egui",
- "egui-wgpu",
- "egui-winit",
- "hostname",
- "image",
- "pollster",
- "reqwest",
- "rfd",
- "self-replace",
- "serde",
- "serde_json",
- "time",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "uuid",
- "wgpu",
- "windows 0.58.0",
- "winit",
- "zip",
 ]
 
 [[package]]

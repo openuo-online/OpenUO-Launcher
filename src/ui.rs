@@ -17,6 +17,7 @@ pub struct LauncherUi {
     pub download_rx: Option<mpsc::Receiver<DownloadEvent>>,
     pub download_progress: Option<(u64, u64)>,
     pub downloading_launcher: bool, // 标记是否正在下载 Launcher
+    pub launcher_restarting: bool, // 标记 Launcher 正在重启
     pub update_rx: Option<mpsc::Receiver<UpdateEvent>>,
     pub remote_open_uo: Option<String>,
     pub remote_launcher: Option<String>,
@@ -39,6 +40,7 @@ impl LauncherUi {
             download_rx: None,
             download_progress: None,
             downloading_launcher: false,
+            launcher_restarting: false,
             update_rx: None,
             remote_open_uo: None,
             screen_info: None,
@@ -192,25 +194,33 @@ impl LauncherUi {
                     launcher_version, launcher_remote
                 ));
                 
-                // 检查是否有新版本或正在下载
-                if has_update || self.downloading_launcher {
-                    let is_downloading = self.downloading_launcher;
-                    let btn_text = if is_downloading {
+                // 检查是否有新版本或正在下载或正在重启
+                if has_update || self.downloading_launcher || self.launcher_restarting {
+                    let is_busy = self.downloading_launcher || self.launcher_restarting;
+                    let btn_text = if self.launcher_restarting {
+                        "✅ 即将重启..."
+                    } else if self.downloading_launcher {
                         "⏳ 更新中..."
                     } else {
                         "🔄 更新 Launcher"
                     };
                     
+                    let btn_color = if is_busy {
+                        egui::Color32::from_rgba_unmultiplied(100, 100, 100, 200)
+                    } else {
+                        egui::Color32::from_rgba_unmultiplied(200, 100, 50, 200)
+                    };
+                    
                     let mut update_btn = egui::Button::new(btn_text)
-                        .fill(egui::Color32::from_rgba_unmultiplied(200, 100, 50, 200))
+                        .fill(btn_color)
                         .min_size(egui::vec2(100.0, 24.0));
                     
-                    // 下载中时禁用按钮
-                    if is_downloading {
+                    // 下载中或重启中时禁用按钮
+                    if is_busy {
                         update_btn = update_btn.sense(egui::Sense::hover());
                     }
                     
-                    if ui.add(update_btn).clicked() && !is_downloading {
+                    if ui.add(update_btn).clicked() && !is_busy {
                         self.start_launcher_update();
                     }
                     
@@ -321,6 +331,7 @@ impl LauncherUi {
             &mut self.download_rx,
             &mut self.download_progress,
             &mut self.downloading_launcher,
+            &mut self.launcher_restarting,
             &mut self.status,
             &mut self.open_uo_version,
         );
@@ -519,6 +530,7 @@ fn poll_download_channel(
     download_rx: &mut Option<mpsc::Receiver<DownloadEvent>>,
     download_progress: &mut Option<(u64, u64)>,
     downloading_launcher: &mut bool,
+    launcher_restarting: &mut bool,
     status: &mut String,
     open_uo_version: &mut Option<String>,
 ) {
@@ -540,6 +552,7 @@ fn poll_download_channel(
                                 // Launcher 更新完成，程序即将退出
                                 let version = tag.strip_prefix("UPDATE_AND_RESTART:").unwrap_or("");
                                 *status = format!("✅ Launcher 更新到 {} 完成！程序即将重启...", version);
+                                *launcher_restarting = true; // 标记正在重启
                                 // 延迟退出，让用户看到消息
                                 std::thread::spawn(|| {
                                     std::thread::sleep(std::time::Duration::from_secs(2));
