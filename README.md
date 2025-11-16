@@ -53,6 +53,19 @@ build.bat         # Windows
 - `launcher_scale_factor` - 缩放因子（Retina 为 2.0）
 - `launcher_is_hidpi` - 是否为高分辨率屏幕
 
+## �️ 路线图
+
+### 计划中的功能
+
+- [ ] **Manifest 客户端管理** - 基于 manifest 文件检测和更新私有客户端补丁
+- [ ] **私钥加密通信** - 使用私有密钥加密客户端与服务器通信
+- [ ] **WebSocket 网页端** - 配合 UO 网关和代理，支持浏览器直接游玩
+- [ ] **独立助手窗体** - 类似 Orion UO 的助手功能，独立窗口管理
+
+### 欢迎贡献
+
+如果你对这些功能感兴趣或有其他想法，欢迎提交 [Issue](https://github.com/openuo-online/Another-OpenUO-Launcher/issues) 讨论！
+
 ## 📄 许可证
 
 GPL-3.0 - 详见 [LICENSE](LICENSE)
