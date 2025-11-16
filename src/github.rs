@@ -138,77 +138,57 @@ pub fn download_launcher_update<F: Fn(DownloadEvent) + Send + 'static>(
         progress_cb(DownloadEvent::Progress { received, total });
     })?;
 
-    // 获取当前可执行文件路径
-    let current_exe = std::env::current_exe()?;
-    
+    // 设置执行权限（Unix 系统）
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        
-        // 设置下载文件的执行权限
         let perms = fs::Permissions::from_mode(0o755);
         fs::set_permissions(&tmp, perms)?;
-        
-        // 创建更新脚本
-        let script_path = std::env::temp_dir().join("update_launcher.sh");
-        let script_content = format!(
-            r#"#!/bin/bash
-sleep 1
-mv "{}" "{}.old"
-mv "{}" "{}"
-chmod +x "{}"
-open "{}"
-"#,
-            current_exe.display(),
-            current_exe.display(),
-            tmp.display(),
-            current_exe.display(),
-            current_exe.display(),
-            current_exe.display()
-        );
-        
-        fs::write(&script_path, script_content)?;
-        fs::set_permissions(&script_path, fs::Permissions::from_mode(0o755))?;
-        
-        // 启动更新脚本并退出当前程序
-        std::process::Command::new("sh")
-            .arg(&script_path)
-            .spawn()?;
-        
-        let version = get_version_string(&release);
-        
-        // 返回特殊标记，告诉 UI 需要退出程序
-        Ok(format!("UPDATE_AND_RESTART:{}", version))
     }
     
-    #[cfg(windows)]
+    // 获取当前可执行文件路径（在替换前）
+    let current_exe = std::env::current_exe()?;
+    
+    // 使用 self_replace 替换当前可执行文件
+    // 这个库会自动处理跨平台的替换逻辑
+    self_replace::self_replace(&tmp)?;
+    
+    // 删除临时文件
+    fs::remove_file(&tmp).ok();
+    
+    let version = get_version_string(&release);
+    
+    // 启动新版本程序
+    #[cfg(target_os = "macos")]
     {
-        // Windows 下创建批处理脚本
-        let script_path = std::env::temp_dir().join("update_launcher.bat");
-        let script_content = format!(
-            r#"@echo off
-timeout /t 1 /nobreak >nul
-move /y "{}" "{}.old"
-move /y "{}" "{}"
-start "" "{}"
-"#,
-            current_exe.display(),
-            current_exe.display(),
-            tmp.display(),
-            current_exe.display(),
-            current_exe.display()
-        );
-        
-        fs::write(&script_path, script_content)?;
-        
-        // 启动更新脚本并退出当前程序
-        std::process::Command::new("cmd")
-            .args(&["/C", &script_path.to_string_lossy()])
-            .spawn()?;
-        
-        let version = get_version_string(&release);
-        Ok(format!("UPDATE_AND_RESTART:{}", version))
+        // macOS 使用 open 命令
+        std::process::Command::new("open")
+            .arg(&current_exe)
+            .spawn()
+            .ok();
     }
+    
+    #[cfg(target_os = "windows")]
+    {
+        // Windows 下使用 cmd /c start 来启动
+        // 使用 start "" "path" 格式，空字符串是窗口标题
+        let exe_str = current_exe.to_string_lossy().to_string();
+        std::process::Command::new("cmd")
+            .args(&["/C", "start", "", &exe_str])
+            .spawn()
+            .ok();
+    }
+    
+    #[cfg(target_os = "linux")]
+    {
+        // Linux 直接启动
+        std::process::Command::new(&current_exe)
+            .spawn()
+            .ok();
+    }
+    
+    // 返回特殊标记，告诉 UI 需要退出程序
+    Ok(format!("UPDATE_AND_RESTART:{}", version))
 }
 
 fn get_launcher_asset_name() -> String {

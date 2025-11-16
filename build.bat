@@ -31,7 +31,7 @@ if errorlevel 1 (
 
 REM 复制到 releases 目录
 set OUTPUT=releases\OpenUO-Launcher-windows-x64-v%VERSION%.exe
-copy target\release\rust-launcher.exe "%OUTPUT%"
+copy target\release\openuo-launcher.exe "%OUTPUT%"
 
 echo.
 echo ✅ Build complete: %OUTPUT%

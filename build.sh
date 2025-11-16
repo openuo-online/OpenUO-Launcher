@@ -29,13 +29,13 @@ if [[ "$CURRENT_OS" == "Darwin" ]]; then
     else
         OUTPUT="releases/OpenUO-Launcher-macos-x64-v$VERSION"
     fi
-    cp target/release/rust-launcher "$OUTPUT"
+    cp target/release/openuo-launcher "$OUTPUT"
 elif [[ "$CURRENT_OS" == "MINGW"* ]] || [[ "$CURRENT_OS" == "MSYS"* ]] || [[ "$CURRENT_OS" == "CYGWIN"* ]]; then
     OUTPUT="releases/OpenUO-Launcher-windows-x64-v$VERSION.exe"
-    cp target/release/rust-launcher.exe "$OUTPUT"
+    cp target/release/openuo-launcher.exe "$OUTPUT"
 else
     OUTPUT="releases/OpenUO-Launcher-linux-v$VERSION"
-    cp target/release/rust-launcher "$OUTPUT"
+    cp target/release/openuo-launcher "$OUTPUT"
 fi
 
 echo "✅ Build complete: $OUTPUT"

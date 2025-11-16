@@ -192,29 +192,42 @@ impl LauncherUi {
                     launcher_version, launcher_remote
                 ));
                 
-                // 检查是否有新版本
-                if has_update {
-                    let update_btn = egui::Button::new("🔄 更新 Launcher")
+                // 检查是否有新版本或正在下载
+                if has_update || self.downloading_launcher {
+                    let is_downloading = self.downloading_launcher;
+                    let btn_text = if is_downloading {
+                        "⏳ 更新中..."
+                    } else {
+                        "🔄 更新 Launcher"
+                    };
+                    
+                    let mut update_btn = egui::Button::new(btn_text)
                         .fill(egui::Color32::from_rgba_unmultiplied(200, 100, 50, 200))
                         .min_size(egui::vec2(100.0, 24.0));
-                    if ui.add(update_btn).clicked() {
+                    
+                    // 下载中时禁用按钮
+                    if is_downloading {
+                        update_btn = update_btn.sense(egui::Sense::hover());
+                    }
+                    
+                    if ui.add(update_btn).clicked() && !is_downloading {
                         self.start_launcher_update();
                     }
-                }
-                
-                // 显示下载进度（仅当正在下载 Launcher 时）
-                if self.downloading_launcher {
-                    if let Some((cur, total)) = self.download_progress {
-                        if total > 0 {
-                            let progress = (cur as f32) / (total as f32);
-                            let total_mb = (total as f32) / (1024.0 * 1024.0);
-                            let cur_mb = (cur as f32) / (1024.0 * 1024.0);
-                            
-                            ui.add(
-                                egui::ProgressBar::new(progress)
-                                    .text(format!("{:.1}/{:.1} MB", cur_mb, total_mb))
-                                    .desired_width(150.0)
-                            );
+                    
+                    // 显示下载进度（仅当正在下载 Launcher 时）
+                    if self.downloading_launcher {
+                        if let Some((cur, total)) = self.download_progress {
+                            if total > 0 {
+                                let progress = (cur as f32) / (total as f32);
+                                let total_mb = (total as f32) / (1024.0 * 1024.0);
+                                let cur_mb = (cur as f32) / (1024.0 * 1024.0);
+                                
+                                ui.add(
+                                    egui::ProgressBar::new(progress)
+                                        .text(format!("{:.1}/{:.1} MB", cur_mb, total_mb))
+                                        .desired_width(150.0)
+                                );
+                            }
                         }
                     }
                 }
@@ -237,20 +250,27 @@ impl LauncherUi {
                     .and_then(|remote| self.open_uo_version.as_ref().map(|local| remote != local))
                     .unwrap_or(false);
                 
-                if self.open_uo_version.is_none() {
-                    // 未安装，显示下载按钮
-                    let download_btn = egui::Button::new("⬇ 下载 OpenUO")
-                        .fill(egui::Color32::from_rgba_unmultiplied(50, 180, 100, 200))
+                let is_downloading_openuo = !self.downloading_launcher && self.download_rx.is_some();
+                
+                if self.open_uo_version.is_none() || has_openuo_update || is_downloading_openuo {
+                    let (btn_text, btn_color) = if is_downloading_openuo {
+                        ("⏳ 下载中...", egui::Color32::from_rgba_unmultiplied(100, 100, 100, 200))
+                    } else if self.open_uo_version.is_none() {
+                        ("⬇ 下载 OpenUO", egui::Color32::from_rgba_unmultiplied(50, 180, 100, 200))
+                    } else {
+                        ("🔄 更新 OpenUO", egui::Color32::from_rgba_unmultiplied(100, 150, 200, 200))
+                    };
+                    
+                    let mut btn = egui::Button::new(btn_text)
+                        .fill(btn_color)
                         .min_size(egui::vec2(100.0, 24.0));
-                    if ui.add(download_btn).clicked() {
-                        self.start_download();
+                    
+                    // 下载中时禁用按钮
+                    if is_downloading_openuo {
+                        btn = btn.sense(egui::Sense::hover());
                     }
-                } else if has_openuo_update {
-                    // 有新版本，显示更新按钮
-                    let update_btn = egui::Button::new("🔄 更新 OpenUO")
-                        .fill(egui::Color32::from_rgba_unmultiplied(100, 150, 200, 200))
-                        .min_size(egui::vec2(100.0, 24.0));
-                    if ui.add(update_btn).clicked() {
+                    
+                    if ui.add(btn).clicked() && !is_downloading_openuo {
                         self.start_download();
                     }
                 }
