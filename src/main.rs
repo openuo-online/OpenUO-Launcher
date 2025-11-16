@@ -1,4 +1,5 @@
 mod config;
+mod crypter;
 mod github;
 mod profile_editor;
 mod ui;
@@ -20,6 +21,37 @@ fn init_tracing() {
     let _ = tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .try_init();
+}
+
+fn get_primary_screen_size() -> (u32, u32) {
+    #[cfg(target_os = "macos")]
+    {
+        use core_graphics::display::CGDisplay;
+        let main_display = CGDisplay::main();
+        let mode = main_display.display_mode().unwrap();
+        (mode.width() as u32, mode.height() as u32)
+    }
+    
+    #[cfg(target_os = "windows")]
+    {
+        unsafe {
+            use windows::Win32::Graphics::Gdi::{GetSystemMetrics, SM_CXSCREEN, SM_CYSCREEN};
+            let width = GetSystemMetrics(SM_CXSCREEN) as u32;
+            let height = GetSystemMetrics(SM_CYSCREEN) as u32;
+            (width, height)
+        }
+    }
+    
+    #[cfg(target_os = "linux")]
+    {
+        // Linux 下使用默认值，或者可以通过 X11/Wayland API 获取
+        (1920, 1080)
+    }
+    
+    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+    {
+        (1920, 1080)
+    }
 }
 
 fn main() -> Result<()> {
@@ -128,6 +160,19 @@ async fn run() -> Result<()> {
 
     let loaded_config = load_config_from_disk();
     let mut ui = LauncherUi::new(loaded_config);
+
+    // 获取屏幕信息
+    let scale_factor = window.scale_factor();
+    let (screen_width, screen_height) = get_primary_screen_size();
+    
+    ui.set_screen_info(screen_width, screen_height, scale_factor);
+    info!(
+        "Screen info: {}x{} @ {:.2}x scale (HiDPI: {})",
+        screen_width,
+        screen_height,
+        scale_factor,
+        scale_factor > 1.0
+    );
 
     info!("Launcher initialized");
 

@@ -1,4 +1,5 @@
 use crate::config::ProfileConfig;
+use crate::crypter;
 
 fn pick_directory(current: &str) -> Option<String> {
     let mut dialog = rfd::FileDialog::new();
@@ -23,7 +24,9 @@ impl ProfileEditor {
         }
     }
 
-    pub fn open(&mut self, profile: ProfileConfig, index: usize) {
+    pub fn open(&mut self, mut profile: ProfileConfig, index: usize) {
+        // 解密密码用于显示
+        profile.settings.password = crypter::decrypt(&profile.settings.password);
         self.editor_index = Some(index);
         self.editor_profile = Some(profile);
     }
@@ -52,7 +55,7 @@ impl ProfileEditor {
                 if let Some(profile) = self.editor_profile.as_mut() {
                     ui.horizontal(|ui| {
                         ui.label("配置名称:");
-                        ui.text_edit_singleline(&mut profile.name);
+                        ui.text_edit_singleline(&mut profile.index.name);
                     });
 
                     ui.separator();
@@ -102,13 +105,13 @@ impl ProfileEditor {
 
                     ui.horizontal(|ui| {
                         ui.label("角色名:");
-                        ui.text_edit_singleline(&mut profile.last_character);
+                        ui.text_edit_singleline(&mut profile.index.last_character_name);
                     });
                     ui.checkbox(&mut profile.settings.auto_login, "自动登录");
                     ui.checkbox(&mut profile.settings.reconnect, "掉线重连");
                     ui.horizontal(|ui| {
                         ui.label("附加参数:");
-                        ui.text_edit_singleline(&mut profile.additional_args);
+                        ui.text_edit_singleline(&mut profile.index.additional_args);
                     });
                 }
 

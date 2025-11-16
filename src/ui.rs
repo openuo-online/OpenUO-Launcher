@@ -24,6 +24,7 @@ pub struct LauncherUi {
     pub checking_launcher: bool,
     pub background_texture: Option<egui::TextureHandle>,
     pub logo_texture: Option<egui::TextureHandle>,
+    pub screen_info: Option<ScreenInfo>,
 }
 
 impl LauncherUi {
@@ -38,6 +39,7 @@ impl LauncherUi {
             download_progress: None,
             update_rx: None,
             remote_open_uo: None,
+            screen_info: None,
             remote_launcher: None,
             last_update_poll: Instant::now() - Duration::from_secs(601),
             checking_open_uo: false,
@@ -65,10 +67,16 @@ impl LauncherUi {
     }
 
     fn show_profile_editor(&mut self, ctx: &egui::Context) {
-        if let Some((idx, profile)) = self.profile_editor.show(ctx) {
+        if let Some((idx, mut profile)) = self.profile_editor.show(ctx) {
+            // 加密密码后再保存
+            profile.settings.password = crate::crypter::encrypt(&profile.settings.password);
             self.config.profiles[idx] = profile;
             self.config.active_profile = idx;
-            self.set_status("已更新配置");
+            // 保存配置到文件（带屏幕信息）
+            match self.save_config_with_screen_info() {
+                Ok(_) => self.set_status("已保存配置"),
+                Err(err) => self.set_status(&format!("保存失败: {err:#}")),
+            }
         }
     }
 
@@ -118,7 +126,7 @@ impl LauncherUi {
                 ui.label("配置:");
                 let profile_name = self
                     .active_profile()
-                    .map(|p| p.name.as_str())
+                    .map(|p| p.index.name.as_str())
                     .unwrap_or("未选择");
 
                 egui::ComboBox::from_id_source("profile_combo")
@@ -126,7 +134,7 @@ impl LauncherUi {
                     .show_ui(ui, |ui| {
                         for (idx, profile) in self.config.profiles.iter().enumerate() {
                             let selected = idx == self.config.active_profile;
-                            if ui.selectable_label(selected, &profile.name).clicked() {
+                            if ui.selectable_label(selected, &profile.index.name).clicked() {
                                 self.config.active_profile = idx;
                             }
                         }
@@ -313,7 +321,8 @@ impl LauncherUi {
         let Some(profile) = self.active_profile().cloned() else {
             anyhow::bail!("没有可用配置");
         };
-        save_config(&mut self.config)?;
+        // 保存配置时带上屏幕信息
+        self.save_config_with_screen_info()?;
         let settings_path = profile_settings_path(&profile);
         let exe = open_uo_binary_path();
         if !exe.exists() {
@@ -328,13 +337,13 @@ impl LauncherUi {
 
         if profile.settings.auto_login {
             cmd.arg("-skiploginscreen");
-            if !profile.last_character.is_empty() {
-                let last = profile.last_character.clone();
+            if !profile.index.last_character_name.is_empty() {
+                let last = profile.index.last_character_name.clone();
                 cmd.arg("-lastcharactername").arg(last);
             }
         }
-        if !profile.additional_args.is_empty() {
-            cmd.args(profile.additional_args.split_whitespace());
+        if !profile.index.additional_args.is_empty() {
+            cmd.args(profile.index.additional_args.split_whitespace());
         }
 
         cmd.spawn()
@@ -342,7 +351,7 @@ impl LauncherUi {
 
         Ok(format!(
             "已启动 OpenUO，配置 [{}]，使用 settings {}",
-            profile.name,
+            profile.index.name,
             profile_settings_path(&profile).display()
         ))
     }
@@ -354,6 +363,7 @@ impl LauncherUi {
     fn open_profile_editor(&mut self) {
         if let Some(profile) = self.active_profile().cloned() {
             let idx = self.config.active_profile;
+            tracing::info!("打开编辑器 - UO目录: {}", profile.settings.ultima_online_directory);
             self.profile_editor.open(profile, idx);
         }
     }
@@ -368,8 +378,9 @@ impl LauncherUi {
     fn duplicate_profile(&mut self) {
         if let Some(profile) = self.active_profile().cloned() {
             let mut cloned = profile;
-            cloned.name = format!("{} (副本)", cloned.name);
-            cloned.settings_file = uuid::Uuid::new_v4().to_string();
+            cloned.index.name = format!("{} (副本)", cloned.index.name);
+            cloned.index.settings_file = uuid::Uuid::new_v4().to_string();
+            cloned.index.file_name = uuid::Uuid::new_v4().to_string();
             self.config.profiles.push(cloned);
             self.config.active_profile = self.config.profiles.len().saturating_sub(1);
             self.set_status("已复制当前配置");
@@ -382,6 +393,9 @@ impl LauncherUi {
             return;
         }
         let idx = self.config.active_profile;
+        let profile = &self.config.profiles[idx];
+        // 删除文件
+        let _ = crate::config::delete_profile(profile);
         self.config.profiles.remove(idx);
         self.config.active_profile = self.config.profiles.len().saturating_sub(1);
         self.set_status("已删除配置");
@@ -389,6 +403,23 @@ impl LauncherUi {
 
     pub fn set_status(&mut self, msg: &str) {
         self.status = format!("{} @ {}", msg, time::OffsetDateTime::now_utc());
+    }
+
+    pub fn set_screen_info(&mut self, width: u32, height: u32, scale_factor: f64) {
+        self.screen_info = Some(ScreenInfo {
+            width,
+            height,
+            scale_factor,
+            is_hidpi: scale_factor > 1.0,
+        });
+    }
+
+    fn save_config_with_screen_info(&mut self) -> Result<()> {
+        // 保存所有档案，带上屏幕信息
+        for profile in &self.config.profiles {
+            save_profile_with_screen_info(profile, self.screen_info)?;
+        }
+        Ok(())
     }
 }
 

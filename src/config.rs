@@ -2,57 +2,75 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use tracing::warn;
 
-const CONFIG_FILE: &str = "launcher_state.json";
+
 const PROFILES_DIR: &str = "Profiles";
 const SETTINGS_DIR: &str = "Profiles/Settings";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LauncherConfig {
-    #[serde(default = "default_profiles")]
+    #[serde(skip)]
     pub profiles: Vec<ProfileConfig>,
-    #[serde(default)]
+    #[serde(skip)]
     pub active_profile: usize,
 }
 
 impl Default for LauncherConfig {
     fn default() -> Self {
         Self {
-            profiles: default_profiles(),
+            profiles: Vec::new(),
             active_profile: 0,
         }
     }
 }
 
+// Profile 索引文件结构（Profiles/{uuid}.json）
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProfileConfig {
+pub struct ProfileIndex {
+    #[serde(rename = "Name")]
     pub name: String,
-    pub last_character: String,
-    pub additional_args: String,
+    #[serde(rename = "SettingsFile")]
     pub settings_file: String,
-    #[serde(default)]
+    #[serde(rename = "FileName")]
+    pub file_name: String,
+    #[serde(rename = "LastCharacterName")]
+    pub last_character_name: String,
+    #[serde(rename = "AdditionalArgs")]
+    pub additional_args: String,
+}
+
+impl Default for ProfileIndex {
+    fn default() -> Self {
+        Self {
+            name: "空白信息".to_string(),
+            settings_file: uuid::Uuid::new_v4().to_string(),
+            file_name: uuid::Uuid::new_v4().to_string(),
+            last_character_name: String::new(),
+            additional_args: String::new(),
+        }
+    }
+}
+
+// 运行时使用的完整 Profile 结构
+#[derive(Debug, Clone)]
+pub struct ProfileConfig {
+    pub index: ProfileIndex,
     pub settings: OuoSettings,
 }
 
 impl Default for ProfileConfig {
     fn default() -> Self {
-        new_profile("默认配置")
+        Self {
+            index: ProfileIndex::default(),
+            settings: OuoSettings::default(),
+        }
     }
-}
-
-fn default_profiles() -> Vec<ProfileConfig> {
-    vec![ProfileConfig::default()]
 }
 
 pub fn new_profile(name: &str) -> ProfileConfig {
-    ProfileConfig {
-        name: name.to_string(),
-        last_character: String::new(),
-        additional_args: String::new(),
-        settings_file: uuid::Uuid::new_v4().to_string(),
-        settings: OuoSettings::default(),
-    }
+    let mut profile = ProfileConfig::default();
+    profile.index.name = name.to_string();
+    profile
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -64,6 +82,7 @@ pub struct Point2 {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct OuoSettings {
     #[serde(rename = "username")]
     pub username: String,
@@ -121,6 +140,16 @@ pub struct OuoSettings {
     pub encryption: u8,
     #[serde(rename = "plugins")]
     pub plugins: Vec<String>,
+    
+    // Launcher 添加的 HiDPI/缩放支持参数
+    #[serde(rename = "launcher_screen_width", skip_serializing_if = "Option::is_none")]
+    pub launcher_screen_width: Option<u32>,
+    #[serde(rename = "launcher_screen_height", skip_serializing_if = "Option::is_none")]
+    pub launcher_screen_height: Option<u32>,
+    #[serde(rename = "launcher_scale_factor", skip_serializing_if = "Option::is_none")]
+    pub launcher_scale_factor: Option<f64>,
+    #[serde(rename = "launcher_is_hidpi", skip_serializing_if = "Option::is_none")]
+    pub launcher_is_hidpi: Option<bool>,
 }
 
 impl Default for OuoSettings {
@@ -154,6 +183,10 @@ impl Default for OuoSettings {
             maps_layouts: String::new(),
             encryption: 0,
             plugins: Vec::new(),
+            launcher_screen_width: None,
+            launcher_screen_height: None,
+            launcher_scale_factor: None,
+            launcher_is_hidpi: None,
         }
     }
 }
@@ -197,10 +230,6 @@ pub fn uo_data_dir_path() -> PathBuf {
     open_uo_dir()
 }
 
-fn config_path() -> PathBuf {
-    base_dir().join(CONFIG_FILE)
-}
-
 pub fn profiles_dir() -> PathBuf {
     base_dir().join(PROFILES_DIR)
 }
@@ -209,117 +238,161 @@ pub fn settings_dir() -> PathBuf {
     base_dir().join(SETTINGS_DIR)
 }
 
+pub fn profile_index_path(profile: &ProfileConfig) -> PathBuf {
+    profiles_dir().join(format!("{}.json", profile.index.file_name))
+}
+
 pub fn profile_settings_path(profile: &ProfileConfig) -> PathBuf {
-    settings_dir().join(format!("{}.json", profile.settings_file))
+    settings_dir().join(format!("{}.json", profile.index.settings_file))
 }
 
 // Config loading and saving
 pub fn load_config_from_disk() -> LauncherConfig {
-    let path = config_path();
-    let mut cfg = match fs::read_to_string(&path) {
-        Ok(raw) => match serde_json::from_str::<LauncherConfig>(&raw) {
-            Ok(mut cfg) => {
-                cfg.active_profile = cfg.active_profile.min(cfg.profiles.len().saturating_sub(1));
-                cfg
+    let mut config = LauncherConfig::default();
+    
+    // 扫描 Profiles 目录加载所有档案
+    let profiles_path = profiles_dir();
+    fs::create_dir_all(&profiles_path).ok();
+    
+    let mut profiles = Vec::new();
+    
+    if let Ok(entries) = fs::read_dir(&profiles_path) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) == Some("json") {
+                if let Ok(profile) = load_profile_from_file(&path) {
+                    profiles.push(profile);
+                }
             }
-            Err(err) => {
-                warn!("配置文件解析失败 {:?}: {err}", path);
-                LauncherConfig::default()
-            }
-        },
-        Err(_) => LauncherConfig::default(),
+        }
+    }
+    
+    // 如果没有档案，创建一个默认档案
+    if profiles.is_empty() {
+        let default_profile = new_profile("默认配置");
+        if save_profile(&default_profile).is_ok() {
+            profiles.push(default_profile);
+        }
+    }
+    
+    config.profiles = profiles;
+    config.active_profile = 0;
+    config
+}
+
+fn load_profile_from_file(path: &PathBuf) -> Result<ProfileConfig> {
+    let raw = fs::read_to_string(path)?;
+    let index: ProfileIndex = serde_json::from_str(&raw)?;
+    
+    tracing::info!("加载档案索引: {} (SettingsFile: {})", index.name, index.settings_file);
+    
+    let mut profile = ProfileConfig {
+        index,
+        settings: OuoSettings::default(),
     };
-
-    for profile in &mut cfg.profiles {
-        hydrate_profile_defaults(profile);
-        load_profile_settings(profile);
+    
+    // 加载对应的 settings 文件
+    let settings_path = profile_settings_path(&profile);
+    tracing::info!("尝试加载 settings: {:?}", settings_path);
+    
+    match fs::read_to_string(&settings_path) {
+        Ok(settings_raw) => {
+            match serde_json::from_str::<OuoSettings>(&settings_raw) {
+                Ok(settings) => {
+                    tracing::info!("成功加载 settings - 用户名: {}, UO目录: {}", 
+                        settings.username, settings.ultima_online_directory);
+                    profile.settings = settings;
+                }
+                Err(e) => {
+                    tracing::warn!("解析 settings 失败: {:?}, 错误: {}", settings_path, e);
+                }
+            }
+        }
+        Err(e) => {
+            tracing::warn!("读取 settings 文件失败: {:?}, 错误: {}", settings_path, e);
+        }
     }
-
-    cfg
+    
+    Ok(profile)
 }
 
-pub fn save_config(config: &mut LauncherConfig) -> Result<PathBuf> {
+pub fn save_profile(profile: &ProfileConfig) -> Result<()> {
+    save_profile_with_screen_info(profile, None)
+}
+
+pub fn save_profile_with_screen_info(
+    profile: &ProfileConfig,
+    screen_info: Option<ScreenInfo>,
+) -> Result<()> {
+    // 创建必要的目录
+    fs::create_dir_all(profiles_dir())?;
     fs::create_dir_all(settings_dir())?;
-
-    let client_path_str = open_uo_dir().to_string_lossy().to_string();
-    let uo_data_path_str = uo_data_dir_path().to_string_lossy().to_string();
-    let profiles_path = profiles_dir().to_string_lossy().to_string();
-
-    for profile in &mut config.profiles {
-        hydrate_profile_defaults(profile);
-        sync_profile_into_settings(profile, &client_path_str, &uo_data_path_str, &profiles_path);
-        write_profile_settings(profile)?;
+    
+    // 保存索引文件
+    let index_json = serde_json::to_string_pretty(&profile.index)?;
+    let index_path = profile_index_path(profile);
+    let tmp = index_path.with_extension("tmp");
+    fs::write(&tmp, index_json)?;
+    fs::rename(&tmp, &index_path)?;
+    
+    // 保存 settings 文件
+    let mut settings = profile.settings.clone();
+    
+    // 同步一些必要的字段
+    // profilespath 留空，让 OpenUO 使用默认位置（OpenUO/Data/Profiles/）
+    settings.profiles_path = String::new();
+    settings.last_server_name = settings.ip.clone();
+    
+    // 添加屏幕信息（如果提供）
+    if let Some(info) = screen_info {
+        settings.launcher_screen_width = Some(info.width);
+        settings.launcher_screen_height = Some(info.height);
+        settings.launcher_scale_factor = Some(info.scale_factor);
+        settings.launcher_is_hidpi = Some(info.is_hidpi);
     }
-
-    let mut sanitized = config.clone();
-    for profile in &mut sanitized.profiles {
-        if !profile.settings.save_account {
-            profile.settings.username.clear();
-            profile.settings.password.clear();
-        }
+    
+    // 如果不保存账号，清空用户名和密码
+    if !settings.save_account {
+        settings.username.clear();
+        settings.password.clear();
     }
-
-    let data = serde_json::to_string_pretty(&sanitized)?;
-    let path = config_path();
-    let tmp = path.with_extension("tmp");
-    fs::write(&tmp, data)?;
-    fs::rename(&tmp, &path)?;
-    Ok(path)
+    
+    let settings_json = serde_json::to_string_pretty(&settings)?;
+    let settings_path = profile_settings_path(profile);
+    let tmp = settings_path.with_extension("tmp");
+    fs::write(&tmp, settings_json)?;
+    fs::rename(&tmp, &settings_path)?;
+    
+    Ok(())
 }
 
-fn hydrate_profile_defaults(profile: &mut ProfileConfig) {
-    if profile.settings_file.is_empty() {
-        profile.settings_file = uuid::Uuid::new_v4().to_string();
-    }
+#[derive(Debug, Clone, Copy)]
+pub struct ScreenInfo {
+    pub width: u32,
+    pub height: u32,
+    pub scale_factor: f64,
+    pub is_hidpi: bool,
 }
 
-fn sync_profile_into_settings(
-    profile: &mut ProfileConfig,
-    _open_uo_dir: &str,
-    _uo_data_path: &str,
-    profiles_path: &str,
-) {
-    // 不要自动覆盖用户设置的 ultima_online_directory
-    // 只在为空时才设置默认值
-    if profile.settings.ultima_online_directory.is_empty() {
-        profile.settings.ultima_online_directory = String::new();
+pub fn save_config(config: &LauncherConfig) -> Result<()> {
+    // 保存所有档案
+    for profile in &config.profiles {
+        save_profile(profile)?;
     }
-    profile.settings.profiles_path = profiles_path.to_string();
-    profile.settings.last_server_name = profile.settings.ip.clone();
-    profile.settings.client_version =
-        detect_client_version_from_uo_resources(&profile.settings.ultima_online_directory)
-            .unwrap_or_default();
-    if !profile.settings.save_account {
-        profile.settings.username.clear();
-        profile.settings.password.clear();
-    }
+    Ok(())
 }
 
-fn load_profile_settings(profile: &mut ProfileConfig) {
-    let path = profile_settings_path(profile);
-    if let Ok(raw) = fs::read_to_string(&path) {
-        if let Ok(settings) = serde_json::from_str::<OuoSettings>(&raw) {
-            profile.settings = settings;
-            return;
-        }
+pub fn delete_profile(profile: &ProfileConfig) -> Result<()> {
+    let index_path = profile_index_path(profile);
+    let settings_path = profile_settings_path(profile);
+    
+    if index_path.exists() {
+        fs::remove_file(index_path)?;
     }
-    profile.settings = OuoSettings::default();
-}
-
-fn write_profile_settings(profile: &ProfileConfig) -> Result<()> {
-    let mut data = profile.settings.clone();
-    if !data.save_account {
-        data.username.clear();
-        data.password.clear();
+    if settings_path.exists() {
+        fs::remove_file(settings_path)?;
     }
-    let json = serde_json::to_string_pretty(&data)?;
-    let path = profile_settings_path(profile);
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    let tmp = path.with_extension("tmp");
-    fs::write(&tmp, json)?;
-    fs::rename(&tmp, &path)?;
+    
     Ok(())
 }
 
