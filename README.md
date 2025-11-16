@@ -2,7 +2,7 @@
 
 现代化的 OpenUO 启动器，使用 Rust 编写，支持 HiDPI 显示器和自动更新。
 
-[OpenUO](https://github.com/openuo-online/OpenUO) 是Fork了TazUO代码后，加入了汉化，以及一些使用体验的修改后的客户端软件，与该项目配套使用更加丝滑。
+[OpenUO](https://github.com/openuo-online/OpenUO) 是Fork了TazUO代码后，加入了汉化，以及一些使用体验的修改后的UO客户端，与该项目配套使用更加丝滑。
 
 <img width="1072" height="744" alt="image" src="https://github.com/user-attachments/assets/a8133599-4faa-43c2-b8df-d696a9ef7cc0" />
 
