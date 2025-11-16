@@ -311,10 +311,28 @@ async fn run() -> Result<()> {
 fn install_cjk_font(ctx: &egui::Context) {
     use std::fs;
     let mut fonts = egui::FontDefinitions::default();
+    
+    // Windows 字体路径
+    #[cfg(target_os = "windows")]
+    let candidates = [
+        "C:\\Windows\\Fonts\\msyh.ttc",      // 微软雅黑
+        "C:\\Windows\\Fonts\\msyhbd.ttc",    // 微软雅黑 Bold
+        "C:\\Windows\\Fonts\\simhei.ttf",    // 黑体
+        "C:\\Windows\\Fonts\\simsun.ttc",    // 宋体
+        "C:\\Windows\\Fonts\\simkai.ttf",    // 楷体
+    ];
+    
+    // macOS 字体路径
+    #[cfg(target_os = "macos")]
     let candidates = [
         "/System/Library/Fonts/PingFang.ttc",
         "/System/Library/Fonts/Hiragino Sans GB W3.ttc",
         "/System/Library/Fonts/Hiragino Sans GB.ttc",
+    ];
+    
+    // Linux 字体路径
+    #[cfg(target_os = "linux")]
+    let candidates = [
         "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
         "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
         "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
@@ -341,5 +359,7 @@ fn install_cjk_font(ctx: &egui::Context) {
             .or_default()
             .insert(0, font_id.to_string());
         ctx.set_fonts(fonts);
+    } else {
+        tracing::warn!("未找到中文字体，中文可能显示为方块");
     }
 }
