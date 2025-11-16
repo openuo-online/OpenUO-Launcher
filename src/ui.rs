@@ -16,6 +16,7 @@ pub struct LauncherUi {
     pub launcher_version: String,
     pub download_rx: Option<mpsc::Receiver<DownloadEvent>>,
     pub download_progress: Option<(u64, u64)>,
+    pub downloading_launcher: bool, // 标记是否正在下载 Launcher
     pub update_rx: Option<mpsc::Receiver<UpdateEvent>>,
     pub remote_open_uo: Option<String>,
     pub remote_launcher: Option<String>,
@@ -37,6 +38,7 @@ impl LauncherUi {
             launcher_version: format!("v{}", env!("CARGO_PKG_VERSION")),
             download_rx: None,
             download_progress: None,
+            downloading_launcher: false,
             update_rx: None,
             remote_open_uo: None,
             screen_info: None,
@@ -199,7 +201,25 @@ impl LauncherUi {
                         self.start_launcher_update();
                     }
                 }
+                
+                // 显示下载进度（仅当正在下载 Launcher 时）
+                if self.downloading_launcher {
+                    if let Some((cur, total)) = self.download_progress {
+                        if total > 0 {
+                            let progress = (cur as f32) / (total as f32);
+                            let total_mb = (total as f32) / (1024.0 * 1024.0);
+                            let cur_mb = (cur as f32) / (1024.0 * 1024.0);
+                            
+                            ui.add(
+                                egui::ProgressBar::new(progress)
+                                    .text(format!("{:.1}/{:.1} MB", cur_mb, total_mb))
+                                    .desired_width(150.0)
+                            );
+                        }
+                    }
+                }
             });
+            
             ui.horizontal(|ui| {
                 let open_uo_text = self
                     .open_uo_version
@@ -211,33 +231,48 @@ impl LauncherUi {
                     self.remote_open_uo.as_deref().unwrap_or("检查失败")
                 };
                 ui.label(format!("OpenUO 本地: {}  远程: {}", open_uo_text, remote));
-                if self.download_rx.is_some() {
-                    ui.label("下载中...");
-                } else if self.open_uo_version.is_none() {
+                
+                // 判断是否需要显示下载/更新按钮
+                let has_openuo_update = self.remote_open_uo.as_ref()
+                    .and_then(|remote| self.open_uo_version.as_ref().map(|local| remote != local))
+                    .unwrap_or(false);
+                
+                if self.open_uo_version.is_none() {
+                    // 未安装，显示下载按钮
                     let download_btn = egui::Button::new("⬇ 下载 OpenUO")
                         .fill(egui::Color32::from_rgba_unmultiplied(50, 180, 100, 200))
                         .min_size(egui::vec2(100.0, 24.0));
                     if ui.add(download_btn).clicked() {
                         self.start_download();
                     }
-                } else {
-                    let redownload_btn = egui::Button::new("🔄 重新下载")
+                } else if has_openuo_update {
+                    // 有新版本，显示更新按钮
+                    let update_btn = egui::Button::new("🔄 更新 OpenUO")
                         .fill(egui::Color32::from_rgba_unmultiplied(100, 150, 200, 200))
-                        .min_size(egui::vec2(80.0, 24.0));
-                    if ui.add(redownload_btn).clicked() {
+                        .min_size(egui::vec2(100.0, 24.0));
+                    if ui.add(update_btn).clicked() {
                         self.start_download();
                     }
                 }
+                
+                // 显示下载进度（仅当正在下载 OpenUO 时）
+                if !self.downloading_launcher && self.download_rx.is_some() {
+                    if let Some((cur, total)) = self.download_progress {
+                        if total > 0 {
+                            let progress = (cur as f32) / (total as f32);
+                            let total_mb = (total as f32) / (1024.0 * 1024.0);
+                            let cur_mb = (cur as f32) / (1024.0 * 1024.0);
+                            
+                            ui.add(
+                                egui::ProgressBar::new(progress)
+                                    .text(format!("{:.1}/{:.1} MB", cur_mb, total_mb))
+                                    .desired_width(150.0)
+                            );
+                        }
+                    }
+                }
+                // 版本一致时不显示任何按钮
             });
-            if let Some((cur, total)) = self.download_progress {
-                let total_mb = (total as f32) / (1024.0 * 1024.0);
-                let cur_mb = (cur as f32) / (1024.0 * 1024.0);
-                ui.label(format!(
-                    "下载进度: {:.1}/{:.1} MB",
-                    cur_mb,
-                    total_mb.max(0.1)
-                ));
-            }
         });
     }
 
@@ -265,6 +300,7 @@ impl LauncherUi {
         poll_download_channel(
             &mut self.download_rx,
             &mut self.download_progress,
+            &mut self.downloading_launcher,
             &mut self.status,
             &mut self.open_uo_version,
         );
@@ -292,6 +328,7 @@ impl LauncherUi {
         });
         self.download_rx = Some(rx);
         self.download_progress = None;
+        self.downloading_launcher = false; // 标记正在下载 OpenUO
     }
 
     fn start_launcher_update(&mut self) {
@@ -308,6 +345,7 @@ impl LauncherUi {
         });
         self.download_rx = Some(rx);
         self.download_progress = None;
+        self.downloading_launcher = true; // 标记正在下载 Launcher
         self.set_status("正在下载 Launcher 更新...");
     }
 
@@ -460,6 +498,7 @@ impl LauncherUi {
 fn poll_download_channel(
     download_rx: &mut Option<mpsc::Receiver<DownloadEvent>>,
     download_progress: &mut Option<(u64, u64)>,
+    downloading_launcher: &mut bool,
     status: &mut String,
     open_uo_version: &mut Option<String>,
 ) {
@@ -473,12 +512,19 @@ fn poll_download_channel(
                 DownloadEvent::Finished(result) => {
                     *download_rx = None;
                     *download_progress = None;
+                    *downloading_launcher = false; // 重置下载标记
                     match result {
                         Ok(tag) => {
-                            // 判断是 OpenUO 还是 Launcher 更新
-                            if tag.contains("Launcher") || tag.starts_with("20") {
-                                // Launcher 更新完成，提示重启
-                                *status = format!("✅ Launcher 更新完成！请重启程序以使用新版本。");
+                            // 判断是否是 Launcher 更新并需要重启
+                            if tag.starts_with("UPDATE_AND_RESTART:") {
+                                // Launcher 更新完成，程序即将退出
+                                let version = tag.strip_prefix("UPDATE_AND_RESTART:").unwrap_or("");
+                                *status = format!("✅ Launcher 更新到 {} 完成！程序即将重启...", version);
+                                // 延迟退出，让用户看到消息
+                                std::thread::spawn(|| {
+                                    std::thread::sleep(std::time::Duration::from_secs(2));
+                                    std::process::exit(0);
+                                });
                             } else {
                                 // OpenUO 下载完成
                                 *open_uo_version = Some(tag.clone());

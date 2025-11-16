@@ -140,26 +140,75 @@ pub fn download_launcher_update<F: Fn(DownloadEvent) + Send + 'static>(
 
     // 获取当前可执行文件路径
     let current_exe = std::env::current_exe()?;
-    let backup = current_exe.with_extension("old");
     
-    // 备份当前版本
-    if current_exe.exists() {
-        fs::copy(&current_exe, &backup)?;
-    }
-    
-    // 替换为新版本
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
+        
+        // 设置下载文件的执行权限
         let perms = fs::Permissions::from_mode(0o755);
         fs::set_permissions(&tmp, perms)?;
+        
+        // 创建更新脚本
+        let script_path = std::env::temp_dir().join("update_launcher.sh");
+        let script_content = format!(
+            r#"#!/bin/bash
+sleep 1
+mv "{}" "{}.old"
+mv "{}" "{}"
+chmod +x "{}"
+open "{}"
+"#,
+            current_exe.display(),
+            current_exe.display(),
+            tmp.display(),
+            current_exe.display(),
+            current_exe.display(),
+            current_exe.display()
+        );
+        
+        fs::write(&script_path, script_content)?;
+        fs::set_permissions(&script_path, fs::Permissions::from_mode(0o755))?;
+        
+        // 启动更新脚本并退出当前程序
+        std::process::Command::new("sh")
+            .arg(&script_path)
+            .spawn()?;
+        
+        let version = get_version_string(&release);
+        
+        // 返回特殊标记，告诉 UI 需要退出程序
+        Ok(format!("UPDATE_AND_RESTART:{}", version))
     }
     
-    fs::copy(&tmp, &current_exe)?;
-    fs::remove_file(&tmp).ok();
-    
-    let version = get_version_string(&release);
-    Ok(version)
+    #[cfg(windows)]
+    {
+        // Windows 下创建批处理脚本
+        let script_path = std::env::temp_dir().join("update_launcher.bat");
+        let script_content = format!(
+            r#"@echo off
+timeout /t 1 /nobreak >nul
+move /y "{}" "{}.old"
+move /y "{}" "{}"
+start "" "{}"
+"#,
+            current_exe.display(),
+            current_exe.display(),
+            tmp.display(),
+            current_exe.display(),
+            current_exe.display()
+        );
+        
+        fs::write(&script_path, script_content)?;
+        
+        // 启动更新脚本并退出当前程序
+        std::process::Command::new("cmd")
+            .args(&["/C", &script_path.to_string_lossy()])
+            .spawn()?;
+        
+        let version = get_version_string(&release);
+        Ok(format!("UPDATE_AND_RESTART:{}", version))
+    }
 }
 
 fn get_launcher_asset_name() -> String {
