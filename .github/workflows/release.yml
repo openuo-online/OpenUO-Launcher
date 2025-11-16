@@ -100,14 +100,21 @@ jobs:
           delete_release: true
         continue-on-error: true
       
+      - name: Get version from Cargo.toml
+        id: get_version
+        run: |
+          VERSION=$(grep '^version' Cargo.toml | head -1 | cut -d'"' -f2)
+          echo "version=v$VERSION" >> $GITHUB_OUTPUT
+      
       - name: Create new release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
-          name: Latest Build
+          name: ${{ steps.get_version.outputs.version }}
           body: |
             🚀 自动构建的最新版本
             
+            📦 版本: ${{ steps.get_version.outputs.version }}
             📅 构建时间: ${{ github.event.head_commit.timestamp }}
             📝 提交信息: ${{ github.event.head_commit.message }}
             🔗 提交 SHA: ${{ github.sha }}

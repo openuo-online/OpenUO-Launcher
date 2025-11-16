@@ -286,26 +286,6 @@ pub fn trigger_update_check_impl(open_uo: bool, launcher: bool) -> mpsc::Receive
 
 // 从 release 中提取版本字符串
 fn get_version_string(release: &GithubRelease) -> String {
-    // 如果是 latest 标签，使用发布时间作为版本标识
-    if release.tag_name == "latest" {
-        // 使用发布时间（格式：2024-11-16T12:34:56Z）
-        if let Some(published) = &release.published_at {
-            // 格式化为：2024-11-16 12:34
-            let formatted = published
-                .replace('T', " ")
-                .replace('Z', "")
-                .chars()
-                .take(16)
-                .collect::<String>();
-            return formatted;
-        }
-        // 备选：使用提交 SHA 的前 7 位
-        if let Some(commit) = &release.target_commitish {
-            if commit.len() >= 7 {
-                return format!("commit-{}", &commit[..7]);
-            }
-        }
-    }
-    // 对于正式版本标签（如 v1.0.0），直接使用 tag_name
-    release.tag_name.clone()
+    // 直接使用 release 的 name 字段作为版本号
+    release.name.clone()
 }

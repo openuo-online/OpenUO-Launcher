@@ -34,7 +34,7 @@ impl LauncherUi {
             status: format!("已加载配置 {}", current_timestamp()),
             profile_editor: ProfileEditor::new(),
             open_uo_version: detect_open_uo_version(),
-            launcher_version: env!("CARGO_PKG_VERSION").to_string(),
+            launcher_version: format!("v{}", env!("CARGO_PKG_VERSION")),
             download_rx: None,
             download_progress: None,
             update_rx: None,
