@@ -1,4 +1,7 @@
 OpenUO-Launcher/
+OpenUO/
 .vs
 .vscode
 .idea
+target/
+.DS_Store
