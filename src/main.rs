@@ -98,7 +98,8 @@ async fn run() -> Result<()> {
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
         backends: wgpu::Backends::all(),
         dx12_shader_compiler: Default::default(),
-        flags: wgpu::InstanceFlags::default(),
+        // 禁用验证层以避免 DirectX 12 的资源状态警告
+        flags: wgpu::InstanceFlags::empty(),
         gles_minor_version: wgpu::Gles3MinorVersion::Automatic,
     });
     let surface = instance.create_surface(window.clone()).context("surface")?;

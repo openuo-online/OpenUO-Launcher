@@ -448,14 +448,14 @@ impl LauncherUi {
         if self.background_texture.is_none() {
             self.background_texture = load_embedded_texture(
                 ctx,
-                "background.png",
+                "launcher_background",
                 include_bytes!("../assets/background.png"),
             );
         }
         if self.logo_texture.is_none() {
             self.logo_texture = load_embedded_texture(
                 ctx,
-                "logo.png",
+                "launcher_logo",
                 include_bytes!("../assets/logo.png"),
             );
         }
