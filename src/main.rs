@@ -1,3 +1,6 @@
+// 在 Windows 上隐藏控制台窗口（GUI 应用）
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 mod config;
 mod crypter;
 mod github;
@@ -61,11 +64,22 @@ fn main() -> Result<()> {
 
 async fn run() -> Result<()> {
     let event_loop = EventLoop::new().context("Failed to create event loop")?;
+    
+    // 加载窗口图标
+    let window_icon = load_window_icon();
+    
+    let mut window_builder = WindowBuilder::new()
+        .with_title("Another OpenUO Launcher")
+        .with_inner_size(LogicalSize::new(960.0, 600.0))
+        .with_min_inner_size(LogicalSize::new(720.0, 480.0));
+    
+    // 设置窗口图标（如果加载成功）
+    if let Some(icon) = window_icon {
+        window_builder = window_builder.with_window_icon(Some(icon));
+    }
+    
     let window = Arc::new(
-        WindowBuilder::new()
-            .with_title("Another OpenUO Launcher")
-            .with_inner_size(LogicalSize::new(960.0, 600.0))
-            .with_min_inner_size(LogicalSize::new(720.0, 480.0))
+        window_builder
             .build(&event_loop)
             .context("Failed to create window")?,
     );
@@ -306,6 +320,33 @@ async fn run() -> Result<()> {
     })?;
 
     Ok(())
+}
+
+fn load_window_icon() -> Option<winit::window::Icon> {
+    // 尝试加载嵌入的图标
+    let icon_bytes = include_bytes!("../assets/centerlogo.png");
+    
+    match image::load_from_memory(icon_bytes) {
+        Ok(img) => {
+            let rgba = img.to_rgba8();
+            let (width, height) = rgba.dimensions();
+            
+            match winit::window::Icon::from_rgba(rgba.into_raw(), width, height) {
+                Ok(icon) => {
+                    tracing::info!("窗口图标加载成功");
+                    Some(icon)
+                }
+                Err(e) => {
+                    tracing::warn!("创建窗口图标失败: {}", e);
+                    None
+                }
+            }
+        }
+        Err(e) => {
+            tracing::warn!("加载图标图片失败: {}", e);
+            None
+        }
+    }
 }
 
 fn install_cjk_font(ctx: &egui::Context) {
