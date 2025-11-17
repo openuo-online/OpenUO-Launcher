@@ -334,7 +334,7 @@ async fn run() -> Result<()> {
 }
 
 fn load_window_icon() -> Option<winit::window::Icon> {
-    // 尝试加载嵌入的图标
+    // 加载嵌入的图标（应为 256x256 或更小）
     let icon_bytes = include_bytes!("../assets/logo.png");
     
     match image::load_from_memory(icon_bytes) {
@@ -344,7 +344,7 @@ fn load_window_icon() -> Option<winit::window::Icon> {
             
             match winit::window::Icon::from_rgba(rgba.into_raw(), width, height) {
                 Ok(icon) => {
-                    tracing::info!("窗口图标加载成功");
+                    tracing::info!("窗口图标加载成功 ({}x{})", width, height);
                     Some(icon)
                 }
                 Err(e) => {
