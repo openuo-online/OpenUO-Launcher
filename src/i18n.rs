@@ -26,8 +26,8 @@ pub fn available_languages() -> Vec<LanguageInfo> {
     
     match serde_json::from_str::<LanguagesConfig>(config_json) {
         Ok(config) => config.languages,
-        Err(e) => {
-            tracing::warn!("解析语言配置失败: {}, 使用默认配置", e);
+        Err(_e) => {
+            tracing::warn!("{}", t!("log.language_config_failed"));
             // 降级方案：返回硬编码的语言列表
             vec![
                 LanguageInfo {
@@ -95,7 +95,7 @@ pub fn init_locale() {
         .unwrap_or(default);
     
     rust_i18n::set_locale(&locale);
-    tracing::info!("系统语言: {}, 使用语言: {}", system_locale, locale);
+    tracing::info!("{}: {}, {}: {}", t!("log.system_language"), system_locale, t!("log.using_language"), locale);
 }
 
 // 重新导出 t! 宏，方便使用

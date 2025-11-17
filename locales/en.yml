@@ -34,20 +34,21 @@ version:
 status:
   config_loaded: "Configuration loaded"
   config_saved: "Configuration saved"
-  save_failed: "Save failed: %{error}"
+  save_failed: "Save failed"
   profile_added: "Profile added"
   profile_copied: "Profile copied"
   profile_deleted: "Profile deleted"
-  profile_keep_one: "At least one profile must be kept."
-  launch_failed: "Launch failed: %{error}"
+  profile_keep_one: "At least one profile must be kept"
+  launch_failed: "Launch failed"
+  launch_success: "Game launched"
   no_profile: "No profile available"
-  openuo_not_found: "OpenUO executable not found: %{path}"
-  download_complete: "OpenUO download complete %{version}"
-  download_failed: "Download failed: %{error}"
+  openuo_not_found: "OpenUO executable not found"
+  download_complete: "Download complete %{version}"
+  download_failed: "Download failed"
   launcher_update_complete: "✅ Launcher updated to %{version}! Restarting..."
   launcher_update_downloading: "Downloading Launcher update..."
-  openuo_check_failed: "OpenUO check failed: %{error}"
-  launcher_check_failed: "Launcher check failed: %{error}"
+  openuo_check_failed: "OpenUO check failed"
+  launcher_check_failed: "Launcher check failed"
 
 # Profile editor
 profile_editor:
@@ -68,3 +69,19 @@ profile_editor:
 # Download progress
 download:
   progress: "%{current}/%{total} MB"
+
+# Log messages (for debugging only)
+log:
+  icon_loaded: "Window icon loaded successfully"
+  icon_create_failed: "Failed to create window icon"
+  icon_load_failed: "Failed to load icon image"
+  font_not_found: "CJK font not found, Chinese characters may display as boxes"
+  launcher_initialized: "Launcher initialized"
+  screen_info: "Screen info"
+  language_config_failed: "Failed to parse language config, using default"
+  system_language: "System language"
+  using_language: "Using language"
+  profile_loaded: "Profile loaded"
+  settings_loaded: "Settings loaded successfully"
+  settings_parse_failed: "Failed to parse settings"
+  settings_read_failed: "Failed to read settings file"

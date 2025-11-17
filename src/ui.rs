@@ -35,7 +35,7 @@ impl LauncherUi {
     pub fn new(config: LauncherConfig) -> Self {
         Self {
             config,
-            status: format!("{} {}", t!("status.config_loaded").to_string(), current_timestamp()),
+            status: format!("{}", t!("status.config_loaded").to_string()),
             profile_editor: ProfileEditor::new(),
             open_uo_version: detect_open_uo_version(),
             launcher_version: format!("v{}", env!("CARGO_PKG_VERSION")),
@@ -82,7 +82,7 @@ impl LauncherUi {
             // 保存配置到文件（带屏幕信息）
             match self.save_config_with_screen_info() {
                 Ok(_) => self.set_status(&t!("status.config_saved")),
-                Err(err) => self.set_status(&t!("status.save_failed", error = format!("{err:#}"))),
+                Err(_err) => self.set_status(&t!("status.save_failed")),
             }
         }
     }
@@ -168,7 +168,7 @@ impl LauncherUi {
                 let profile_name = self
                     .active_profile()
                     .map(|p| p.index.name.as_str())
-                    .unwrap_or("未选择");
+                    .unwrap_or("");
 
                 egui::ComboBox::from_id_source("profile_combo")
                     .selected_text(profile_name)
@@ -360,7 +360,7 @@ impl LauncherUi {
                 if ui.add(launch_btn).clicked() {
                     match self.launch_open_uo() {
                         Ok(msg) => self.set_status(&msg),
-                        Err(err) => self.set_status(&t!("status.launch_failed", error = format!("{err:#}"))),
+                        Err(_err) => self.set_status(&t!("status.launch_failed")),
                     }
                 }
             });
@@ -463,14 +463,14 @@ impl LauncherUi {
 
     fn launch_open_uo(&mut self) -> Result<String> {
         let Some(profile) = self.active_profile().cloned() else {
-            anyhow::bail!("没有可用配置");
+            anyhow::bail!("{}", t!("status.no_profile"));
         };
         // 保存配置时带上屏幕信息
         self.save_config_with_screen_info()?;
         let settings_path = profile_settings_path(&profile);
         let exe = open_uo_binary_path();
         if !exe.exists() {
-            anyhow::bail!("未找到 OpenUO 可执行文件: {}", exe.display());
+            anyhow::bail!("{}", t!("status.openuo_not_found"));
         }
 
         let mut cmd = Command::new(exe);
@@ -491,13 +491,9 @@ impl LauncherUi {
         }
 
         cmd.spawn()
-            .with_context(|| "无法启动 OpenUO，请确认路径及权限")?;
+            .with_context(|| t!("status.launch_failed").to_string())?;
 
-        Ok(format!(
-            "已启动 OpenUO，配置 [{}]，使用 settings {}",
-            profile.index.name,
-            profile_settings_path(&profile).display()
-        ))
+        Ok(t!("status.launch_success").to_string())
     }
 
     fn active_profile(&self) -> Option<&ProfileConfig> {
@@ -507,7 +503,6 @@ impl LauncherUi {
     fn open_profile_editor(&mut self) {
         if let Some(profile) = self.active_profile().cloned() {
             let idx = self.config.active_profile;
-            tracing::info!("打开编辑器 - UO目录: {}", profile.settings.ultima_online_directory);
             self.profile_editor.open(profile, idx);
         }
     }
@@ -522,7 +517,7 @@ impl LauncherUi {
     fn duplicate_profile(&mut self) {
         if let Some(profile) = self.active_profile().cloned() {
             let mut cloned = profile;
-            cloned.index.name = format!("{} (副本)", cloned.index.name);
+            cloned.index.name = format!("{} - Copy", cloned.index.name);
             cloned.index.settings_file = uuid::Uuid::new_v4().to_string();
             cloned.index.file_name = uuid::Uuid::new_v4().to_string();
             self.config.profiles.push(cloned);
@@ -605,8 +600,8 @@ fn poll_download_channel(
                                 *status = t!("status.download_complete", version = &tag).to_string();
                             }
                         }
-                        Err(err) => {
-                            *status = t!("status.download_failed", error = &err).to_string();
+                        Err(_err) => {
+                            *status = t!("status.download_failed").to_string();
                         }
                     }
                 }
@@ -631,9 +626,9 @@ fn poll_update_channel(
                     *checking_open_uo = false;
                     match res {
                         Ok(v) => *remote_open_uo = Some(v),
-                        Err(e) => {
+                        Err(_e) => {
                             *remote_open_uo = None;
-                            *status = t!("status.openuo_check_failed", error = &e).to_string();
+                            *status = t!("status.openuo_check_failed").to_string();
                         }
                     }
                 }
@@ -641,9 +636,9 @@ fn poll_update_channel(
                     *checking_launcher = false;
                     match res {
                         Ok(v) => *remote_launcher = Some(v),
-                        Err(e) => {
+                        Err(_e) => {
                             *remote_launcher = None;
-                            *status = t!("status.launcher_check_failed", error = &e).to_string();
+                            *status = t!("status.launcher_check_failed").to_string();
                         }
                     }
                 }
@@ -651,10 +646,6 @@ fn poll_update_channel(
             }
         }
     }
-}
-
-fn current_timestamp() -> String {
-    format!("{:?}", time::OffsetDateTime::now_utc())
 }
 
 fn load_embedded_texture(

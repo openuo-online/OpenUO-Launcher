@@ -284,7 +284,7 @@ fn load_profile_from_file(path: &PathBuf) -> Result<ProfileConfig> {
     let raw = fs::read_to_string(path)?;
     let index: ProfileIndex = serde_json::from_str(&raw)?;
     
-    tracing::info!("加载档案索引: {} (SettingsFile: {})", index.name, index.settings_file);
+    tracing::info!("{}: {}", crate::i18n::t!("log.profile_loaded"), index.name);
     
     let mut profile = ProfileConfig {
         index,
@@ -293,23 +293,21 @@ fn load_profile_from_file(path: &PathBuf) -> Result<ProfileConfig> {
     
     // 加载对应的 settings 文件
     let settings_path = profile_settings_path(&profile);
-    tracing::info!("尝试加载 settings: {:?}", settings_path);
     
     match fs::read_to_string(&settings_path) {
         Ok(settings_raw) => {
             match serde_json::from_str::<OuoSettings>(&settings_raw) {
                 Ok(settings) => {
-                    tracing::info!("成功加载 settings - 用户名: {}, UO目录: {}", 
-                        settings.username, settings.ultima_online_directory);
+                    tracing::info!("{}: {}", crate::i18n::t!("log.settings_loaded"), settings.username);
                     profile.settings = settings;
                 }
-                Err(e) => {
-                    tracing::warn!("解析 settings 失败: {:?}, 错误: {}", settings_path, e);
+                Err(_e) => {
+                    tracing::warn!("{}", crate::i18n::t!("log.settings_parse_failed"));
                 }
             }
         }
-        Err(e) => {
-            tracing::warn!("读取 settings 文件失败: {:?}, 错误: {}", settings_path, e);
+        Err(_e) => {
+            tracing::warn!("{}", crate::i18n::t!("log.settings_read_failed"));
         }
     }
     

@@ -34,20 +34,21 @@ version:
 status:
   config_loaded: "已加载配置"
   config_saved: "已保存配置"
-  save_failed: "保存失败: %{error}"
+  save_failed: "保存失败"
   profile_added: "已新增配置"
   profile_copied: "已复制当前配置"
   profile_deleted: "已删除配置"
-  profile_keep_one: "至少保留一个配置。"
-  launch_failed: "启动失败: %{error}"
+  profile_keep_one: "至少保留一个配置"
+  launch_failed: "启动失败"
+  launch_success: "游戏已启动"
   no_profile: "没有可用配置"
-  openuo_not_found: "未找到 OpenUO 可执行文件: %{path}"
-  download_complete: "OpenUO 下载完成 %{version}"
-  download_failed: "下载失败: %{error}"
+  openuo_not_found: "未找到 OpenUO 可执行文件"
+  download_complete: "下载完成 %{version}"
+  download_failed: "下载失败"
   launcher_update_complete: "✅ Launcher 更新到 %{version} 完成！程序即将重启..."
   launcher_update_downloading: "正在下载 Launcher 更新..."
-  openuo_check_failed: "OpenUO 检查失败: %{error}"
-  launcher_check_failed: "Launcher 检查失败: %{error}"
+  openuo_check_failed: "OpenUO 检查失败"
+  launcher_check_failed: "Launcher 检查失败"
 
 # 配置编辑器
 profile_editor:
@@ -68,3 +69,19 @@ profile_editor:
 # 下载进度
 download:
   progress: "%{current}/%{total} MB"
+
+# 日志信息（仅用于调试）
+log:
+  icon_loaded: "窗口图标加载成功"
+  icon_create_failed: "创建窗口图标失败"
+  icon_load_failed: "加载图标图片失败"
+  font_not_found: "未找到中文字体，中文可能显示为方块"
+  launcher_initialized: "Launcher 已初始化"
+  screen_info: "屏幕信息"
+  language_config_failed: "解析语言配置失败，使用默认配置"
+  system_language: "系统语言"
+  using_language: "使用语言"
+  profile_loaded: "配置已加载"
+  settings_loaded: "设置加载成功"
+  settings_parse_failed: "解析设置失败"
+  settings_read_failed: "读取设置文件失败"

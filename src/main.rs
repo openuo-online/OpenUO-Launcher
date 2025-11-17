@@ -193,14 +193,15 @@ async fn run() -> Result<()> {
     
     ui.set_screen_info(screen_width, screen_height, scale_factor);
     info!(
-        "Screen info: {}x{} @ {:.2}x scale (HiDPI: {})",
+        "{}: {}x{} @ {:.2}x scale (HiDPI: {})",
+        i18n::t!("log.screen_info"),
         screen_width,
         screen_height,
         scale_factor,
         scale_factor > 1.0
     );
 
-    info!("Launcher initialized");
+    info!("{}", i18n::t!("log.launcher_initialized"));
 
     event_loop.run(move |event, target| match event {
         Event::WindowEvent { event, window_id } if window_id == window.id() => {
@@ -345,17 +346,17 @@ fn load_window_icon() -> Option<winit::window::Icon> {
             
             match winit::window::Icon::from_rgba(rgba.into_raw(), width, height) {
                 Ok(icon) => {
-                    tracing::info!("窗口图标加载成功 ({}x{})", width, height);
+                    tracing::info!("{} ({}x{})", i18n::t!("log.icon_loaded"), width, height);
                     Some(icon)
                 }
-                Err(e) => {
-                    tracing::warn!("创建窗口图标失败: {}", e);
+                Err(_e) => {
+                    tracing::warn!("{}", i18n::t!("log.icon_create_failed"));
                     None
                 }
             }
         }
-        Err(e) => {
-            tracing::warn!("加载图标图片失败: {}", e);
+        Err(_e) => {
+            tracing::warn!("{}", i18n::t!("log.icon_load_failed"));
             None
         }
     }
@@ -421,6 +422,6 @@ fn install_cjk_font(ctx: &egui::Context) {
             .insert(0, font_id.to_string());
         ctx.set_fonts(fonts);
     } else {
-        tracing::warn!("未找到中文字体，中文可能显示为方块");
+        tracing::warn!("{}", i18n::t!("log.font_not_found"));
     }
 }
