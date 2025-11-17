@@ -546,7 +546,7 @@ impl LauncherUi {
     }
 
     pub fn set_status(&mut self, msg: &str) {
-        self.status = format!("{} @ {}", msg, time::OffsetDateTime::now_utc());
+        self.status = msg.to_string();
     }
 
     pub fn set_screen_info(&mut self, width: u32, height: u32, scale_factor: f64) {
