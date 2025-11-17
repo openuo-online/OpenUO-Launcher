@@ -335,8 +335,27 @@ pub fn save_profile_with_screen_info(
     fs::write(&tmp, index_json)?;
     fs::rename(&tmp, &index_path)?;
     
-    // 保存 settings 文件
-    let mut settings = profile.settings.clone();
+    // 从文件重新加载 settings，保留游戏可能修改的窗口信息
+    let settings_path = profile_settings_path(profile);
+    let mut settings = if settings_path.exists() {
+        // 如果文件存在，加载它以保留窗口位置等信息
+        match fs::read_to_string(&settings_path) {
+            Ok(raw) => serde_json::from_str::<OuoSettings>(&raw).unwrap_or_else(|_| profile.settings.clone()),
+            Err(_) => profile.settings.clone(),
+        }
+    } else {
+        profile.settings.clone()
+    };
+    
+    // 只更新 Launcher 管理的字段，不覆盖窗口信息
+    settings.username = profile.settings.username.clone();
+    settings.password = profile.settings.password.clone();
+    settings.ip = profile.settings.ip.clone();
+    settings.port = profile.settings.port;
+    settings.ultima_online_directory = profile.settings.ultima_online_directory.clone();
+    settings.save_account = profile.settings.save_account;
+    settings.auto_login = profile.settings.auto_login;
+    settings.reconnect = profile.settings.reconnect;
     
     // 同步一些必要的字段
     // profilespath 留空，让 OpenUO 使用默认位置（OpenUO/Data/Profiles/）
@@ -358,7 +377,6 @@ pub fn save_profile_with_screen_info(
     }
     
     let settings_json = serde_json::to_string_pretty(&settings)?;
-    let settings_path = profile_settings_path(profile);
     let tmp = settings_path.with_extension("tmp");
     fs::write(&tmp, settings_json)?;
     fs::rename(&tmp, &settings_path)?;
