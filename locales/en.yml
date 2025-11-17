@@ -1,0 +1,70 @@
+_version: 1
+
+# Window title
+window:
+  title: Another OpenUO Launcher
+
+# Main interface
+main:
+  profile: "Profile:"
+  edit: "✏ Edit"
+  new: "➕ New"
+  copy: "📋 Copy"
+  delete: "🗑 Delete"
+  launch: "🎮 Launch Game"
+  language: "Language:"
+
+# Version info
+version:
+  launcher_local: "Launcher Local:"
+  launcher_remote: "Remote:"
+  openuo_local: "OpenUO Local:"
+  openuo_remote: "Remote:"
+  checking: "Checking..."
+  check_failed: "Check Failed"
+  not_installed: "Not Installed"
+  update_launcher: "🔄 Update Launcher"
+  updating: "⏳ Updating..."
+  restarting: "✅ Restarting..."
+  download_openuo: "⬇ Download OpenUO"
+  update_openuo: "🔄 Update OpenUO"
+  downloading: "⏳ Downloading..."
+
+# Status messages
+status:
+  config_loaded: "Configuration loaded"
+  config_saved: "Configuration saved"
+  save_failed: "Save failed: %{error}"
+  profile_added: "Profile added"
+  profile_copied: "Profile copied"
+  profile_deleted: "Profile deleted"
+  profile_keep_one: "At least one profile must be kept."
+  launch_failed: "Launch failed: %{error}"
+  no_profile: "No profile available"
+  openuo_not_found: "OpenUO executable not found: %{path}"
+  download_complete: "OpenUO download complete %{version}"
+  download_failed: "Download failed: %{error}"
+  launcher_update_complete: "✅ Launcher updated to %{version}! Restarting..."
+  launcher_update_downloading: "Downloading Launcher update..."
+  openuo_check_failed: "OpenUO check failed: %{error}"
+  launcher_check_failed: "Launcher check failed: %{error}"
+
+# Profile editor
+profile_editor:
+  title: "Edit Profile"
+  name: "Profile Name:"
+  username: "Username:"
+  password: "Password:"
+  server_host: "Server Host:"
+  server_port: "Port:"
+  uo_directory: "UO Directory:"
+  browse: "Browse..."
+  auto_login: "Auto Login"
+  last_character: "Last Character:"
+  additional_args: "Additional Args:"
+  save: "Save"
+  cancel: "Cancel"
+
+# Download progress
+download:
+  progress: "%{current}/%{total} MB"

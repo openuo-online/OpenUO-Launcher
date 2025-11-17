@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 
 use crate::config::*;
 use crate::github::*;
+use crate::i18n::t;
 use crate::profile_editor::ProfileEditor;
 
 pub struct LauncherUi {
@@ -27,13 +28,14 @@ pub struct LauncherUi {
     pub background_texture: Option<egui::TextureHandle>,
     pub logo_texture: Option<egui::TextureHandle>,
     pub screen_info: Option<ScreenInfo>,
+    pub current_locale: String,
 }
 
 impl LauncherUi {
     pub fn new(config: LauncherConfig) -> Self {
         Self {
             config,
-            status: format!("已加载配置 {}", current_timestamp()),
+            status: format!("{} {}", t!("status.config_loaded").to_string(), current_timestamp()),
             profile_editor: ProfileEditor::new(),
             open_uo_version: detect_open_uo_version(),
             launcher_version: format!("v{}", env!("CARGO_PKG_VERSION")),
@@ -50,6 +52,7 @@ impl LauncherUi {
             checking_launcher: false,
             background_texture: None,
             logo_texture: None,
+            current_locale: crate::i18n::current_locale().to_string(),
         }
     }
 
@@ -78,8 +81,8 @@ impl LauncherUi {
             self.config.active_profile = idx;
             // 保存配置到文件（带屏幕信息）
             match self.save_config_with_screen_info() {
-                Ok(_) => self.set_status("已保存配置"),
-                Err(err) => self.set_status(&format!("保存失败: {err:#}")),
+                Ok(_) => self.set_status(&t!("status.config_saved")),
+                Err(err) => self.set_status(&t!("status.save_failed", error = format!("{err:#}"))),
             }
         }
     }
@@ -103,9 +106,11 @@ impl LauncherUi {
                 ui.horizontal(|ui| {
                     ui.add_space(margin);
                     ui.vertical(|ui| {
-                        ui.heading(RichText::new("Another OpenUO Launcher").size(24.0).strong());
+                        ui.heading(RichText::new(t!("window.title")).size(24.0).strong());
                         ui.add_space(12.0);
 
+                        self.show_language_selector(ui);
+                        ui.add_space(8.0);
                         self.show_profile_selector(ui);
                         ui.add_space(8.0);
                         self.show_version_info(ui);
@@ -123,11 +128,39 @@ impl LauncherUi {
             });
     }
 
+    fn show_language_selector(&mut self, ui: &mut egui::Ui) {
+        egui::Frame::none().show(ui, |ui| {
+            ui.set_min_width(ui.available_width());
+            ui.horizontal(|ui| {
+                ui.label(t!("main.language"));
+                
+                let current_name = match self.current_locale.as_str() {
+                    "zh-CN" => "简体中文",
+                    "en" => "English",
+                    _ => &self.current_locale,
+                };
+                
+                egui::ComboBox::from_id_source("language_combo")
+                    .selected_text(current_name)
+                    .show_ui(ui, |ui| {
+                        if ui.selectable_label(self.current_locale == "zh-CN", "简体中文").clicked() {
+                            self.current_locale = "zh-CN".to_string();
+                            crate::i18n::set_locale("zh-CN");
+                        }
+                        if ui.selectable_label(self.current_locale == "en", "English").clicked() {
+                            self.current_locale = "en".to_string();
+                            crate::i18n::set_locale("en");
+                        }
+                    });
+            });
+        });
+    }
+
     fn show_profile_selector(&mut self, ui: &mut egui::Ui) {
         egui::Frame::none().show(ui, |ui| {
             ui.set_min_width(ui.available_width());
             ui.horizontal(|ui| {
-                ui.label("配置:");
+                ui.label(t!("main.profile"));
                 let profile_name = self
                     .active_profile()
                     .map(|p| p.index.name.as_str())
@@ -144,28 +177,28 @@ impl LauncherUi {
                         }
                     });
 
-                let edit_btn = egui::Button::new("✏ 编辑")
+                let edit_btn = egui::Button::new(t!("main.edit"))
                     .fill(egui::Color32::from_rgba_unmultiplied(50, 120, 200, 200))
                     .min_size(egui::vec2(60.0, 24.0));
                 if ui.add(edit_btn).clicked() {
                     self.open_profile_editor();
                 }
                 
-                let new_btn = egui::Button::new("➕ 新建")
+                let new_btn = egui::Button::new(t!("main.new"))
                     .fill(egui::Color32::from_rgba_unmultiplied(50, 180, 100, 200))
                     .min_size(egui::vec2(60.0, 24.0));
                 if ui.add(new_btn).clicked() {
                     self.add_profile();
                 }
                 
-                let copy_btn = egui::Button::new("📋 复制")
+                let copy_btn = egui::Button::new(t!("main.copy"))
                     .fill(egui::Color32::from_rgba_unmultiplied(100, 150, 200, 200))
                     .min_size(egui::vec2(60.0, 24.0));
                 if ui.add(copy_btn).clicked() {
                     self.duplicate_profile();
                 }
                 
-                let delete_btn = egui::Button::new("🗑 删除")
+                let delete_btn = egui::Button::new(t!("main.delete"))
                     .fill(egui::Color32::from_rgba_unmultiplied(200, 80, 80, 200))
                     .min_size(egui::vec2(60.0, 24.0));
                 if ui.add(delete_btn).clicked() {
@@ -179,9 +212,9 @@ impl LauncherUi {
         egui::Frame::none().show(ui, |ui| {
             ui.set_min_width(ui.available_width());
             let launcher_remote = if self.checking_launcher {
-                "检查中...".to_string()
+                t!("version.checking").to_string()
             } else {
-                self.remote_launcher.clone().unwrap_or_else(|| "检查失败".to_string())
+                self.remote_launcher.clone().unwrap_or_else(|| t!("version.check_failed").to_string())
             };
             let launcher_version = self.launcher_version.clone();
             let has_update = self.remote_launcher.as_ref()
@@ -190,19 +223,20 @@ impl LauncherUi {
             
             ui.horizontal(|ui| {
                 ui.label(format!(
-                    "Launcher 本地: {}  远程: {}",
-                    launcher_version, launcher_remote
+                    "{} {}  {}: {}",
+                    t!("version.launcher_local"), launcher_version,
+                    t!("version.launcher_remote"), launcher_remote
                 ));
                 
                 // 检查是否有新版本或正在下载或正在重启
                 if has_update || self.downloading_launcher || self.launcher_restarting {
                     let is_busy = self.downloading_launcher || self.launcher_restarting;
                     let btn_text = if self.launcher_restarting {
-                        "✅ 即将重启..."
+                        t!("version.restarting").to_string()
                     } else if self.downloading_launcher {
-                        "⏳ 更新中..."
+                        t!("version.updating").to_string()
                     } else {
-                        "🔄 更新 Launcher"
+                        t!("version.update_launcher").to_string()
                     };
                     
                     let btn_color = if is_busy {
@@ -247,13 +281,16 @@ impl LauncherUi {
                 let open_uo_text = self
                     .open_uo_version
                     .clone()
-                    .unwrap_or_else(|| "未安装".to_string());
+                    .unwrap_or_else(|| t!("version.not_installed").to_string());
                 let remote = if self.checking_open_uo {
-                    "检查中..."
+                    t!("version.checking").to_string()
                 } else {
-                    self.remote_open_uo.as_deref().unwrap_or("检查失败")
+                    self.remote_open_uo.as_deref().map(|s| s.to_string()).unwrap_or_else(|| t!("version.check_failed").to_string())
                 };
-                ui.label(format!("OpenUO 本地: {}  远程: {}", open_uo_text, remote));
+                ui.label(format!("{} {}  {}: {}", 
+                    t!("version.openuo_local"), open_uo_text,
+                    t!("version.openuo_remote"), remote
+                ));
                 
                 // 判断是否需要显示下载/更新按钮
                 let has_openuo_update = self.remote_open_uo.as_ref()
@@ -264,11 +301,11 @@ impl LauncherUi {
                 
                 if self.open_uo_version.is_none() || has_openuo_update || is_downloading_openuo {
                     let (btn_text, btn_color) = if is_downloading_openuo {
-                        ("⏳ 下载中...", egui::Color32::from_rgba_unmultiplied(100, 100, 100, 200))
+                        (t!("version.downloading").to_string(), egui::Color32::from_rgba_unmultiplied(100, 100, 100, 200))
                     } else if self.open_uo_version.is_none() {
-                        ("⬇ 下载 OpenUO", egui::Color32::from_rgba_unmultiplied(50, 180, 100, 200))
+                        (t!("version.download_openuo").to_string(), egui::Color32::from_rgba_unmultiplied(50, 180, 100, 200))
                     } else {
-                        ("🔄 更新 OpenUO", egui::Color32::from_rgba_unmultiplied(100, 150, 200, 200))
+                        (t!("version.update_openuo").to_string(), egui::Color32::from_rgba_unmultiplied(100, 150, 200, 200))
                     };
                     
                     let mut btn = egui::Button::new(btn_text)
@@ -311,7 +348,7 @@ impl LauncherUi {
             ui.set_min_width(ui.available_width());
             ui.horizontal(|ui| {
                 let launch_btn = egui::Button::new(
-                    RichText::new("🎮 启动游戏").size(18.0).strong()
+                    RichText::new(t!("main.launch")).size(18.0).strong()
                 )
                 .fill(egui::Color32::from_rgba_unmultiplied(80, 180, 80, 220))
                 .min_size(egui::vec2(150.0, 40.0));
@@ -319,7 +356,7 @@ impl LauncherUi {
                 if ui.add(launch_btn).clicked() {
                     match self.launch_open_uo() {
                         Ok(msg) => self.set_status(&msg),
-                        Err(err) => self.set_status(&format!("启动失败: {err:#}")),
+                        Err(err) => self.set_status(&t!("status.launch_failed", error = format!("{err:#}"))),
                     }
                 }
             });
@@ -377,7 +414,7 @@ impl LauncherUi {
         self.download_rx = Some(rx);
         self.download_progress = None;
         self.downloading_launcher = true; // 标记正在下载 Launcher
-        self.set_status("正在下载 Launcher 更新...");
+        self.set_status(&t!("status.launcher_update_downloading"));
     }
 
     fn trigger_update_checks(&mut self, open_uo: bool, launcher: bool) {
@@ -414,8 +451,8 @@ impl LauncherUi {
         if self.logo_texture.is_none() {
             self.logo_texture = load_embedded_texture(
                 ctx,
-                "centerlogo.png",
-                include_bytes!("../assets/centerlogo.png"),
+                "logo.png",
+                include_bytes!("../assets/logo.png"),
             );
         }
     }
@@ -472,10 +509,10 @@ impl LauncherUi {
     }
 
     fn add_profile(&mut self) {
-        let p = new_profile(&format!("配置 {}", self.config.profiles.len() + 1));
+        let p = new_profile(&format!("{} {}", t!("main.profile"), self.config.profiles.len() + 1));
         self.config.profiles.push(p);
         self.config.active_profile = self.config.profiles.len().saturating_sub(1);
-        self.set_status("已新增配置");
+        self.set_status(&t!("status.profile_added"));
     }
 
     fn duplicate_profile(&mut self) {
@@ -486,13 +523,13 @@ impl LauncherUi {
             cloned.index.file_name = uuid::Uuid::new_v4().to_string();
             self.config.profiles.push(cloned);
             self.config.active_profile = self.config.profiles.len().saturating_sub(1);
-            self.set_status("已复制当前配置");
+            self.set_status(&t!("status.profile_copied"));
         }
     }
 
     fn delete_profile(&mut self) {
         if self.config.profiles.len() <= 1 {
-            self.set_status("至少保留一个配置。");
+            self.set_status(&t!("status.profile_keep_one"));
             return;
         }
         let idx = self.config.active_profile;
@@ -501,7 +538,7 @@ impl LauncherUi {
         let _ = crate::config::delete_profile(profile);
         self.config.profiles.remove(idx);
         self.config.active_profile = self.config.profiles.len().saturating_sub(1);
-        self.set_status("已删除配置");
+        self.set_status(&t!("status.profile_deleted"));
     }
 
     pub fn set_status(&mut self, msg: &str) {
@@ -551,7 +588,7 @@ fn poll_download_channel(
                             if tag.starts_with("UPDATE_AND_RESTART:") {
                                 // Launcher 更新完成，程序即将退出
                                 let version = tag.strip_prefix("UPDATE_AND_RESTART:").unwrap_or("");
-                                *status = format!("✅ Launcher 更新到 {} 完成！程序即将重启...", version);
+                                *status = t!("status.launcher_update_complete", version = version).to_string();
                                 *launcher_restarting = true; // 标记正在重启
                                 // 延迟退出，让用户看到消息
                                 std::thread::spawn(|| {
@@ -561,11 +598,11 @@ fn poll_download_channel(
                             } else {
                                 // OpenUO 下载完成
                                 *open_uo_version = Some(tag.clone());
-                                *status = format!("OpenUO 下载完成 {}", tag);
+                                *status = t!("status.download_complete", version = &tag).to_string();
                             }
                         }
                         Err(err) => {
-                            *status = format!("下载失败: {err}");
+                            *status = t!("status.download_failed", error = &err).to_string();
                         }
                     }
                 }
@@ -592,7 +629,7 @@ fn poll_update_channel(
                         Ok(v) => *remote_open_uo = Some(v),
                         Err(e) => {
                             *remote_open_uo = None;
-                            *status = format!("OpenUO 检查失败: {e}");
+                            *status = t!("status.openuo_check_failed", error = &e).to_string();
                         }
                     }
                 }
@@ -602,7 +639,7 @@ fn poll_update_channel(
                         Ok(v) => *remote_launcher = Some(v),
                         Err(e) => {
                             *remote_launcher = None;
-                            *status = format!("Launcher 检查失败: {e}");
+                            *status = t!("status.launcher_check_failed", error = &e).to_string();
                         }
                     }
                 }

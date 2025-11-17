@@ -1,0 +1,70 @@
+_version: 1
+
+# 窗口标题
+window:
+  title: Another OpenUO Launcher
+
+# 主界面
+main:
+  profile: "配置:"
+  edit: "✏ 编辑"
+  new: "➕ 新建"
+  copy: "📋 复制"
+  delete: "🗑 删除"
+  launch: "🎮 启动游戏"
+  language: "语言:"
+
+# 版本信息
+version:
+  launcher_local: "Launcher 本地:"
+  launcher_remote: "远程:"
+  openuo_local: "OpenUO 本地:"
+  openuo_remote: "远程:"
+  checking: "检查中..."
+  check_failed: "检查失败"
+  not_installed: "未安装"
+  update_launcher: "🔄 更新 Launcher"
+  updating: "⏳ 更新中..."
+  restarting: "✅ 即将重启..."
+  download_openuo: "⬇ 下载 OpenUO"
+  update_openuo: "🔄 更新 OpenUO"
+  downloading: "⏳ 下载中..."
+
+# 状态消息
+status:
+  config_loaded: "已加载配置"
+  config_saved: "已保存配置"
+  save_failed: "保存失败: %{error}"
+  profile_added: "已新增配置"
+  profile_copied: "已复制当前配置"
+  profile_deleted: "已删除配置"
+  profile_keep_one: "至少保留一个配置。"
+  launch_failed: "启动失败: %{error}"
+  no_profile: "没有可用配置"
+  openuo_not_found: "未找到 OpenUO 可执行文件: %{path}"
+  download_complete: "OpenUO 下载完成 %{version}"
+  download_failed: "下载失败: %{error}"
+  launcher_update_complete: "✅ Launcher 更新到 %{version} 完成！程序即将重启..."
+  launcher_update_downloading: "正在下载 Launcher 更新..."
+  openuo_check_failed: "OpenUO 检查失败: %{error}"
+  launcher_check_failed: "Launcher 检查失败: %{error}"
+
+# 配置编辑器
+profile_editor:
+  title: "编辑配置"
+  name: "配置名称:"
+  username: "用户名:"
+  password: "密码:"
+  server_host: "服务器地址:"
+  server_port: "端口:"
+  uo_directory: "UO 目录:"
+  browse: "浏览..."
+  auto_login: "自动登录"
+  last_character: "上次角色名:"
+  additional_args: "额外参数:"
+  save: "保存"
+  cancel: "取消"
+
+# 下载进度
+download:
+  progress: "%{current}/%{total} MB"

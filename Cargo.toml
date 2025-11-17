@@ -27,6 +27,8 @@ rfd = "0.14"
 image = { version = "0.24", default-features = false, features = ["png"] }
 hostname = "0.4"
 self-replace = "1.5"
+rust-i18n = "3"
+sys-locale = "0.3"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 core-graphics = "0.23"

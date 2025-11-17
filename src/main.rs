@@ -1,9 +1,13 @@
 // 在 Windows 上隐藏控制台窗口（GUI 应用）
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+// 初始化 i18n（必须在最前面）
+rust_i18n::i18n!("locales", fallback = "en");
+
 mod config;
 mod crypter;
 mod github;
+mod i18n;
 mod profile_editor;
 mod ui;
 
@@ -59,6 +63,10 @@ fn get_primary_screen_size() -> (u32, u32) {
 
 fn main() -> Result<()> {
     init_tracing();
+    
+    // 初始化国际化
+    i18n::init_locale();
+    
     pollster::block_on(run())
 }
 
@@ -324,7 +332,7 @@ async fn run() -> Result<()> {
 
 fn load_window_icon() -> Option<winit::window::Icon> {
     // 尝试加载嵌入的图标
-    let icon_bytes = include_bytes!("../assets/centerlogo.png");
+    let icon_bytes = include_bytes!("../assets/logo.png");
     
     match image::load_from_memory(icon_bytes) {
         Ok(img) => {
