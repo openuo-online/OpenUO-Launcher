@@ -134,22 +134,26 @@ impl LauncherUi {
             ui.horizontal(|ui| {
                 ui.label(t!("main.language"));
                 
-                let current_name = match self.current_locale.as_str() {
-                    "zh-CN" => "简体中文",
-                    "en" => "English",
-                    _ => &self.current_locale,
-                };
+                // 获取可用语言列表
+                let languages = crate::i18n::available_languages();
+                
+                // 查找当前语言的显示名称
+                let current_name = languages
+                    .iter()
+                    .find(|lang| lang.code == self.current_locale)
+                    .map(|lang| lang.native_name.as_str())
+                    .unwrap_or(&self.current_locale);
                 
                 egui::ComboBox::from_id_source("language_combo")
                     .selected_text(current_name)
                     .show_ui(ui, |ui| {
-                        if ui.selectable_label(self.current_locale == "zh-CN", "简体中文").clicked() {
-                            self.current_locale = "zh-CN".to_string();
-                            crate::i18n::set_locale("zh-CN");
-                        }
-                        if ui.selectable_label(self.current_locale == "en", "English").clicked() {
-                            self.current_locale = "en".to_string();
-                            crate::i18n::set_locale("en");
+                        // 动态生成语言选项
+                        for lang in languages {
+                            let is_selected = self.current_locale == lang.code;
+                            if ui.selectable_label(is_selected, &lang.native_name).clicked() {
+                                self.current_locale = lang.code.clone();
+                                crate::i18n::set_locale(&lang.code);
+                            }
                         }
                     });
             });

@@ -1,0 +1,17 @@
+{
+  "languages": [
+    {
+      "code": "zh-CN",
+      "name": "简体中文",
+      "native_name": "简体中文",
+      "file": "zh-CN.yml"
+    },
+    {
+      "code": "en",
+      "name": "English",
+      "native_name": "English",
+      "file": "en.yml"
+    }
+  ],
+  "default": "en"
+}
