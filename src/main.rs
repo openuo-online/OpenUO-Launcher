@@ -51,7 +51,10 @@ fn get_primary_screen_size() -> (u32, u32) {
     
     #[cfg(target_os = "linux")]
     {
-        // Linux 下使用默认值，或者可以通过 X11/Wayland API 获取
+        // Linux 下使用默认值
+        // 注意：实际分辨率会通过 winit 的 window.scale_factor() 正确处理
+        // 如需精确获取，可以使用 X11 (libxrandr) 或 Wayland API
+        // 但由于 winit 已经处理了 DPI 缩放，这个默认值通常足够
         (1920, 1080)
     }
     
@@ -382,10 +385,18 @@ fn install_cjk_font(ctx: &egui::Context) {
     // Linux 字体路径
     #[cfg(target_os = "linux")]
     let candidates = [
+        // Noto CJK (最常见)
         "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
         "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
         "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
         "/usr/share/fonts/noto-cjk/NotoSansSC-Regular.otf",
+        // WenQuanYi (文泉驿)
+        "/usr/share/fonts/wenquanyi/wqy-microhei/wqy-microhei.ttc",
+        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+        // Droid Sans Fallback
+        "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
+        // AR PL UMing (文鼎)
+        "/usr/share/fonts/truetype/arphic/uming.ttc",
     ];
 
     let font_id = "cjk-fallback";

@@ -1,76 +1,94 @@
 # Another OpenUO Launcher
 
-现代化的 OpenUO 启动器，使用 Rust 编写，支持 HiDPI 显示器和自动更新。
+English | [简体中文](README.zh-CN.md)
 
-[OpenUO](https://github.com/openuo-online/OpenUO) 是Fork了TazUO代码后，加入了汉化，以及一些使用体验的修改后的UO客户端，与该项目配套使用更加丝滑。
+A modern OpenUO launcher written in Rust, with HiDPI display support and automatic updates.
+
+[OpenUO](https://github.com/openuo-online/OpenUO) is a fork of TazUO with Chinese localization and enhanced user experience improvements, designed to work seamlessly with this launcher.
 
 <img width="1072" height="744" alt="image" src="https://github.com/user-attachments/assets/a8133599-4faa-43c2-b8df-d696a9ef7cc0" />
 
-## ✨ 特性
+## ✨ Features
 
-- 🎨 现代化 UI，支持 Retina/HiDPI 显示器
-- 🔄 一键自动更新 OpenUO 和 Launcher
-- 📦 多配置管理，轻松切换服务器
-- 🔐 密码加密保存
-- 🌍 跨平台支持（Windows、macOS Intel/ARM）
+- 🎨 Modern UI with Retina/HiDPI display support
+- 🔄 One-click automatic updates for OpenUO and Launcher
+- 📦 Multiple profile management for easy server switching
+- 🔐 Encrypted password storage
+- 🌍 Cross-platform support (Windows, macOS Intel/ARM, Linux x64)
+- 🌐 Multi-language support (Chinese, English)
 
-## 📥 下载
+## 📥 Download
 
-访问 [Releases](https://github.com/openuo-online/Another-OpenUO-Launcher/releases/latest) 下载最新版本
+Visit [Releases](https://github.com/openuo-online/Another-OpenUO-Launcher/releases/latest) to download the latest version
 
-## 🚀 快速开始
+## 🚀 Quick Start
 
-1. 下载并运行 Launcher
-2. 点击"下载 OpenUO"自动安装客户端
-3. 配置服务器和账号
-4. 启动游戏
+1. Download and run the Launcher
+2. Click "Download OpenUO" to automatically install the client
+3. Configure server and account settings
+4. Launch the game
 
-## 🛠️ 开发
+## 🛠️ Development
 
 ```bash
-# 克隆项目
+# Clone the repository
 git clone https://github.com/openuo-online/Another-OpenUO-Launcher.git
 cd Another-OpenUO-Launcher
 
-# 运行
+# Run
 cargo run
 
-# 构建
-./build.sh        # macOS/Linux
+# Build
+./build.sh        # macOS/Linux (auto-detect platform)
 build.bat         # Windows
 ```
 
-## 📝 配置文件
+### Linux Dependencies
 
-配置存储在 `Profiles/` 目录：
-- `{uuid}.json` - 档案索引（名称、角色等）
-- `Settings/{uuid}.json` - 详细设置（服务器、账号等）
+Building on Linux requires the following dependencies:
 
-## 🎯 HiDPI 支持
+```bash
+# Ubuntu/Debian
+sudo apt-get install libgtk-3-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev
 
-自动检测屏幕分辨率和缩放因子，传递给 OpenUO：
-- `launcher_screen_width/height` - 屏幕尺寸
-- `launcher_scale_factor` - 缩放因子（Retina 为 2.0）
-- `launcher_is_hidpi` - 是否为高分辨率屏幕
+# Fedora/RHEL
+sudo dnf install gtk3-devel libxcb-devel libxkbcommon-devel openssl-devel
 
-## �️ 路线图
+# Arch Linux
+sudo pacman -S gtk3 libxcb libxkbcommon openssl
+```
 
-### 计划中的功能
+## 📝 Configuration Files
 
-- [ ] **Manifest 客户端管理** - 基于 manifest 文件检测和更新私有客户端补丁
-- [ ] **私钥加密通信** - 使用私有密钥加密客户端与服务器通信
-- [ ] **WebSocket 网页端** - 配合 UO 网关和代理，支持浏览器直接游玩
-- [ ] **独立助手窗体** - 类似 Orion UO 的助手功能，独立窗口管理
+Configurations are stored in the `Profiles/` directory:
+- `{uuid}.json` - Profile index (name, character, etc.)
+- `Settings/{uuid}.json` - Detailed settings (server, account, etc.)
 
-### 欢迎贡献
+## 🎯 HiDPI Support
 
-如果你对这些功能感兴趣或有其他想法，欢迎提交 [Issue](https://github.com/openuo-online/Another-OpenUO-Launcher/issues) 讨论！
+Automatically detects screen resolution and scaling factor, passed to OpenUO:
+- `launcher_screen_width/height` - Screen dimensions
+- `launcher_scale_factor` - Scaling factor (2.0 for Retina)
+- `launcher_is_hidpi` - Whether it's a high-resolution display
 
-## 📄 许可证
+## 🗺️ Roadmap
 
-GPL-3.0 - 详见 [LICENSE](LICENSE)
+### Planned Features
 
-## 🙏 致谢
+- [ ] **Manifest Client Management** - Detect and update private client patches based on manifest files
+- [ ] **Private Key Encrypted Communication** - Encrypt client-server communication using private keys
+- [ ] **WebSocket Web Client** - Support browser-based gameplay with UO gateway and proxy
+- [ ] **Standalone Assistant Window** - Independent window management similar to Orion UO assistant features
+
+### Contributions Welcome
+
+If you're interested in these features or have other ideas, feel free to submit an [Issue](https://github.com/openuo-online/Another-OpenUO-Launcher/issues) for discussion!
+
+## 📄 License
+
+GPL-3.0 - See [LICENSE](LICENSE) for details
+
+## 🙏 Acknowledgments
 
 - [TazUO](https://github.com/PlayTazUO/TazUO) - TazUO
-- [egui](https://github.com/emilk/egui) - UI 框架
+- [egui](https://github.com/emilk/egui) - UI Framework
