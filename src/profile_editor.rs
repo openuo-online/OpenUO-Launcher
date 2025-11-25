@@ -89,7 +89,6 @@ impl ProfileEditor {
                     ui.separator();
                     ui.label("游戏设置");
 
-                    ui.label(egui::RichText::new("⚠ UO 资源目录（包含 client.exe 的目录）").size(12.0).color(egui::Color32::from_rgb(200, 200, 100)));
                     ui.horizontal(|ui| {
                         ui.label("UO 资源目录:");
                         ui.text_edit_singleline(&mut profile.settings.ultima_online_directory);
@@ -102,13 +101,58 @@ impl ProfileEditor {
                             }
                         }
                     });
+                    
+                    // 显示当前 UO 版本号和加密设置
+                    if !profile.settings.ultima_online_directory.is_empty() {
+                        let client_exe = std::path::Path::new(&profile.settings.ultima_online_directory).join("client.exe");
+                        if client_exe.exists() {
+                            if let Some(version) = crate::version_reader::read_pe_version(&client_exe) {
+                                // 显示版本号
+                                ui.label(egui::RichText::new(format!("客户端版本: {}", version)).size(11.0).color(egui::Color32::from_rgb(150, 150, 150)));
+                                
+                                // 自动更新 client_version 字段
+                                if profile.settings.client_version != version {
+                                    profile.settings.client_version = version.clone();
+                                }
+                                
+                                // 根据版本号推荐加密类型（如果没有强制禁用加密）
+                                if !profile.settings.force_no_encryption {
+                                    let suggested = crate::encryption_helper::suggest_encryption_from_version(&version);
+                                    if profile.settings.encryption != suggested {
+                                        profile.settings.encryption = suggested;
+                                    }
+                                }
+                                
+                                // 显示当前加密状态
+                                let encryption_text = if profile.settings.force_no_encryption {
+                                    "不加密（已强制禁用）"
+                                } else if profile.settings.encryption == 1 {
+                                    "加密"
+                                } else {
+                                    "不加密"
+                                };
+                                ui.label(egui::RichText::new(format!("加密状态: {}", encryption_text)).size(11.0).color(egui::Color32::from_rgb(150, 150, 150)));
+                            } else {
+                                ui.label(egui::RichText::new("✓ 已找到 client.exe").size(11.0).color(egui::Color32::from_rgb(100, 200, 100)));
+                            }
+                        } else {
+                            ui.label(egui::RichText::new("⚠ 未找到 client.exe").size(11.0).color(egui::Color32::from_rgb(200, 100, 100)));
+                        }
+                    }
+                    
+                    // 强制禁用加密的选项
+                    ui.checkbox(&mut profile.settings.force_no_encryption, "强制不使用加密（私服常用）");
 
                     ui.horizontal(|ui| {
                         ui.label("角色名:");
                         ui.text_edit_singleline(&mut profile.index.last_character_name);
                     });
-                    ui.checkbox(&mut profile.settings.auto_login, "自动登录");
-                    ui.checkbox(&mut profile.settings.reconnect, "掉线重连");
+                    
+                    // 自动登录和掉线重连排在一行
+                    ui.horizontal(|ui| {
+                        ui.checkbox(&mut profile.settings.auto_login, "自动登录");
+                        ui.checkbox(&mut profile.settings.reconnect, "掉线重连");
+                    });
                     ui.horizontal(|ui| {
                         ui.label("附加参数:");
                         ui.text_edit_singleline(&mut profile.index.additional_args);

@@ -6,10 +6,12 @@ rust_i18n::i18n!("locales", fallback = "en");
 
 mod config;
 mod crypter;
+mod encryption_helper;
 mod github;
 mod i18n;
 mod profile_editor;
 mod ui;
+mod version_reader;
 
 use anyhow::{Context, Result};
 use egui_wgpu::{Renderer, ScreenDescriptor};

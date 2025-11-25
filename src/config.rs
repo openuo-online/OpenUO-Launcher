@@ -138,6 +138,8 @@ pub struct OuoSettings {
     pub maps_layouts: String,
     #[serde(rename = "encryption")]
     pub encryption: u8,
+    #[serde(rename = "force_no_encryption", default)]
+    pub force_no_encryption: bool,
     #[serde(rename = "plugins")]
     pub plugins: Vec<String>,
     
@@ -182,6 +184,7 @@ impl Default for OuoSettings {
             use_verdata: false,
             maps_layouts: String::new(),
             encryption: 0,
+            force_no_encryption: false,
             plugins: Vec::new(),
             launcher_screen_width: None,
             launcher_screen_height: None,
@@ -354,6 +357,15 @@ pub fn save_profile_with_screen_info(
     settings.save_account = profile.settings.save_account;
     settings.auto_login = profile.settings.auto_login;
     settings.reconnect = profile.settings.reconnect;
+    settings.client_version = profile.settings.client_version.clone();
+    
+    // 处理加密设置：如果强制禁用加密，设置为 0
+    if profile.settings.force_no_encryption {
+        settings.encryption = 0;
+    } else {
+        settings.encryption = profile.settings.encryption;
+    }
+    settings.force_no_encryption = profile.settings.force_no_encryption;
     
     // 同步一些必要的字段
     // profilespath 留空，让 OpenUO 使用默认位置（OpenUO/Data/Profiles/）
