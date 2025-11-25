@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- WiX Toolset 安装脚本 -->
+<!-- 下载 WiX: https://wixtoolset.org/releases/ -->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <?define ProductVersion="0.1.0" ?>
+  <?define ProductName="OpenUO Launcher" ?>
+  <?define Manufacturer="OpenUO Contributors" ?>
+  <?define UpgradeCode="8F9A7B2C-3D4E-5F6A-7B8C-9D0E1F2A3B4C" ?>
+  
+  <Product Id="*" 
+           Name="$(var.ProductName)" 
+           Language="1033" 
+           Version="$(var.ProductVersion)" 
+           Manufacturer="$(var.Manufacturer)" 
+           UpgradeCode="$(var.UpgradeCode)">
+    
+    <Package InstallerVersion="200" 
+             Compressed="yes" 
+             InstallScope="perUser" 
+             Description="$(var.ProductName) Installer"
+             Comments="Another OpenUO Launcher" />
+
+    <!-- 升级策略：自动卸载旧版本 -->
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- 应用图标 -->
+    <Icon Id="AppIcon" SourceFile="assets\icon.ico" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon" />
+    
+    <!-- 添加/删除程序中的信息 -->
+    <Property Id="ARPHELPLINK" Value="https://github.com/openuo-online/Another-OpenUO-Launcher" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/openuo-online/Another-OpenUO-Launcher" />
+
+    <!-- 功能定义 -->
+    <Feature Id="ProductFeature" Title="OpenUO Launcher" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
+      <ComponentRef Id="ApplicationShortcut" />
+      <ComponentRef Id="ApplicationShortcutDesktop" />
+    </Feature>
+
+    <!-- UI 配置 -->
+    <UIRef Id="WixUI_InstallDir" />
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+    
+    <!-- 许可协议 -->
+    <WixVariable Id="WixUILicenseRtf" Value="LICENSE.rtf" />
+  </Product>
+
+  <Fragment>
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <!-- 程序文件目录 -->
+      <Directory Id="LocalAppDataFolder">
+        <Directory Id="INSTALLFOLDER" Name="OpenUO Launcher" />
+      </Directory>
+      
+      <!-- 开始菜单 -->
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ApplicationProgramsFolder" Name="OpenUO Launcher"/>
+      </Directory>
+      
+      <!-- 桌面 -->
+      <Directory Id="DesktopFolder" Name="Desktop" />
+    </Directory>
+  </Fragment>
+
+  <Fragment>
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      <!-- 主程序 -->
+      <Component Id="MainExecutable" Guid="1A2B3C4D-5E6F-7A8B-9C0D-1E2F3A4B5C6D">
+        <File Id="OpenUOLauncherEXE" 
+              Source="target\release\openuo-launcher.exe" 
+              KeyPath="yes" 
+              Checksum="yes">
+          <Shortcut Id="StartMenuShortcut"
+                    Directory="ApplicationProgramsFolder"
+                    Name="OpenUO Launcher"
+                    WorkingDirectory="INSTALLFOLDER"
+                    Icon="AppIcon"
+                    IconIndex="0"
+                    Advertise="yes" />
+        </File>
+      </Component>
+      
+      <!-- README -->
+      <Component Id="ReadmeFile" Guid="2B3C4D5E-6F7A-8B9C-0D1E-2F3A4B5C6D7E">
+        <File Id="README" Source="README.md" KeyPath="yes" />
+      </Component>
+      
+      <!-- LICENSE -->
+      <Component Id="LicenseFile" Guid="3C4D5E6F-7A8B-9C0D-1E2F-3A4B5C6D7E8F">
+        <File Id="LICENSE" Source="LICENSE" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- 开始菜单快捷方式 -->
+    <DirectoryRef Id="ApplicationProgramsFolder">
+      <Component Id="ApplicationShortcut" Guid="4D5E6F7A-8B9C-0D1E-2F3A-4B5C6D7E8F9A">
+        <RemoveFolder Id="CleanUpShortCut" Directory="ApplicationProgramsFolder" On="uninstall"/>
+        <RegistryValue Root="HKCU" 
+                       Key="Software\OpenUO\Launcher" 
+                       Name="installed" 
+                       Type="integer" 
+                       Value="1" 
+                       KeyPath="yes"/>
+      </Component>
+    </DirectoryRef>
+    
+    <!-- 桌面快捷方式（可选） -->
+    <DirectoryRef Id="DesktopFolder">
+      <Component Id="ApplicationShortcutDesktop" Guid="5E6F7A8B-9C0D-1E2F-3A4B-5C6D7E8F9A0B">
+        <Shortcut Id="DesktopShortcut"
+                  Name="OpenUO Launcher"
+                  Description="Another OpenUO Launcher"
+                  Target="[INSTALLFOLDER]openuo-launcher.exe"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Icon="AppIcon"
+                  IconIndex="0"/>
+        <RemoveFolder Id="CleanUpDesktopShortcut" On="uninstall"/>
+        <RegistryValue Root="HKCU" 
+                       Key="Software\OpenUO\Launcher" 
+                       Name="desktop_shortcut" 
+                       Type="integer" 
+                       Value="1" 
+                       KeyPath="yes"/>
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+</Wix>
