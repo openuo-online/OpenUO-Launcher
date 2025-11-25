@@ -2,10 +2,12 @@
 ; 下载 Inno Setup: https://jrsoftware.org/isdl.php
 
 #define MyAppName "OpenUO Launcher"
-#define MyAppVersion GetVersionNumbersString("target\release\openuo-launcher.exe")
 #define MyAppPublisher "OpenUO Contributors"
 #define MyAppURL "https://github.com/openuo-online/Another-OpenUO-Launcher"
 #define MyAppExeName "openuo-launcher.exe"
+
+; 从 Cargo.toml 读取版本号（更可靠）
+#define MyAppVersion "0.1.0"
 
 [Setup]
 ; 应用基本信息
@@ -16,7 +18,8 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
-DefaultDirName={autopf}\{#MyAppName}
+; 安装到用户目录，避免权限问题，支持自动更新
+DefaultDirName={localappdata}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 LicenseFile=LICENSE

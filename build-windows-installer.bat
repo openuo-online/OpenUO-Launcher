@@ -46,6 +46,9 @@ echo [Creating installer...]
 REM 创建输出目录
 if not exist releases mkdir releases
 
+REM 更新 installer.iss 中的版本号
+powershell -Command "(Get-Content installer.iss) -replace '#define MyAppVersion \".*\"', '#define MyAppVersion \"%VERSION%\"' | Set-Content installer.iss"
+
 REM 编译安装程序
 "%ISCC_PATH%" installer.iss
 if errorlevel 1 (
