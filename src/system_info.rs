@@ -1,5 +1,28 @@
 /// 系统信息辅助模块
 
+/// 获取操作系统名称（简单版本）
+pub fn os_name() -> String {
+    #[cfg(target_os = "windows")]
+    {
+        "windows".to_string()
+    }
+    
+    #[cfg(target_os = "macos")]
+    {
+        "macos".to_string()
+    }
+    
+    #[cfg(target_os = "linux")]
+    {
+        "linux".to_string()
+    }
+    
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    {
+        "unknown".to_string()
+    }
+}
+
 /// 获取操作系统名称和版本
 pub fn os_name_version() -> String {
     #[cfg(target_os = "windows")]

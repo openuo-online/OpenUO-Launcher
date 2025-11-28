@@ -852,13 +852,15 @@ impl LauncherUi {
             height,
             scale_factor,
             is_hidpi: scale_factor > 1.0,
+            lang: crate::i18n::current_locale(),
+            os: crate::system_info::os_name(),
         });
     }
 
     fn save_config_with_screen_info(&mut self) -> Result<()> {
         // 保存所有档案，带上屏幕信息
         for profile in &self.config.profiles {
-            save_profile_with_screen_info(profile, self.screen_info)?;
+            save_profile_with_screen_info(profile, self.screen_info.clone())?;
         }
         Ok(())
     }

@@ -179,6 +179,10 @@ pub struct OuoSettings {
     pub launcher_scale_factor: Option<f64>,
     #[serde(rename = "launcher_is_hidpi", skip_serializing_if = "Option::is_none")]
     pub launcher_is_hidpi: Option<bool>,
+    #[serde(rename = "launcher_lang", skip_serializing_if = "Option::is_none")]
+    pub launcher_lang: Option<String>,
+    #[serde(rename = "launcher_os", skip_serializing_if = "Option::is_none")]
+    pub launcher_os: Option<String>,
 }
 
 impl Default for OuoSettings {
@@ -217,6 +221,8 @@ impl Default for OuoSettings {
             launcher_screen_height: None,
             launcher_scale_factor: None,
             launcher_is_hidpi: None,
+            launcher_lang: None,
+            launcher_os: None,
         }
     }
 }
@@ -412,6 +418,8 @@ pub fn save_profile_with_screen_info(
         settings.launcher_screen_height = Some(info.height);
         settings.launcher_scale_factor = Some(info.scale_factor);
         settings.launcher_is_hidpi = Some(info.is_hidpi);
+        settings.launcher_lang = Some(info.lang.clone());
+        settings.launcher_os = Some(info.os.clone());
     }
     
     // 如果不保存账号，清空用户名和密码
@@ -428,12 +436,14 @@ pub fn save_profile_with_screen_info(
     Ok(())
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct ScreenInfo {
     pub width: u32,
     pub height: u32,
     pub scale_factor: f64,
     pub is_hidpi: bool,
+    pub lang: String,
+    pub os: String,
 }
 
 pub fn save_config(config: &LauncherConfig) -> Result<()> {
