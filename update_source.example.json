@@ -1,0 +1,5 @@
+{
+  "openuo_url": "https://your-cdn.com/openuo/latest.json",
+  "launcher_url": "https://your-cdn.com/launcher/latest.json",
+  "use_github_format": false
+}

@@ -64,6 +64,22 @@ Configurations are stored in the `Profiles/` directory:
 - `{uuid}.json` - Profile index (name, character, etc.)
 - `Settings/{uuid}.json` - Detailed settings (server, account, etc.)
 
+## 🌐 Custom Update Source
+
+If you encounter GitHub API rate limits (403 errors), you can configure your own CDN:
+
+Create `update_source.json` in the same directory as the Launcher:
+
+```json
+{
+  "openuo_url": "https://your-cdn.com/openuo/latest.json",
+  "launcher_url": "https://your-cdn.com/launcher/latest.json",
+  "use_github_format": false
+}
+```
+
+For detailed configuration, see: [Custom Update Source Documentation](docs/CUSTOM_UPDATE_SOURCE.md)
+
 ## 🎯 HiDPI Support
 
 Automatically detects screen resolution and scaling factor, passed to OpenUO:

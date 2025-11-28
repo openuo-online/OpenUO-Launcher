@@ -64,6 +64,22 @@ sudo pacman -S gtk3 libxcb libxkbcommon openssl
 - `{uuid}.json` - 档案索引（名称、角色等）
 - `Settings/{uuid}.json` - 详细设置（服务器、账号等）
 
+## 🌐 自定义更新源
+
+如果遇到 GitHub API 速率限制（403 错误），可以配置自己的 CDN：
+
+在 Launcher 同目录创建 `update_source.json`：
+
+```json
+{
+  "openuo_url": "https://your-cdn.com/openuo/latest.json",
+  "launcher_url": "https://your-cdn.com/launcher/latest.json",
+  "use_github_format": false
+}
+```
+
+详细配置方法请参考：[自定义更新源文档](docs/CUSTOM_UPDATE_SOURCE.zh-CN.md)
+
 ## 🎯 HiDPI 支持
 
 自动检测屏幕分辨率和缩放因子，传递给 OpenUO：

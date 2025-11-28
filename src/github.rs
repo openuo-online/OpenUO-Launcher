@@ -14,6 +14,52 @@ const LAUNCHER_RELEASE_URL: &str =
     "https://api.github.com/repos/openuo-online/Another-OpenUO-Launcher/releases/latest";
 const OPEN_UO_VERSION_FILE: &str = ".open_uo_version";
 
+// 自定义更新源配置文件
+const UPDATE_SOURCE_CONFIG: &str = "update_source.json";
+
+/// 自定义更新源配置
+#[derive(Debug, Clone, Deserialize)]
+pub struct UpdateSourceConfig {
+    /// OpenUO 更新信息 URL（可以是 GitHub API 或自定义 JSON）
+    pub openuo_url: Option<String>,
+    /// Launcher 更新信息 URL
+    pub launcher_url: Option<String>,
+    /// 是否使用 GitHub API 格式（false 则使用简化格式）
+    #[serde(default = "default_true")]
+    pub use_github_format: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+/// 简化的更新信息格式（用于自定义 CDN）
+#[derive(Debug, Clone, Deserialize)]
+pub struct SimpleRelease {
+    /// 版本号/标签
+    pub version: String,
+    /// 下载 URL（可以是对象或字符串）
+    pub download_url: DownloadUrls,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum DownloadUrls {
+    /// 单个 URL（自动根据平台选择）
+    Single(String),
+    /// 多平台 URL
+    Multiple {
+        #[serde(rename = "osx-arm64")]
+        osx_arm64: Option<String>,
+        #[serde(rename = "osx-x64")]
+        osx_x64: Option<String>,
+        #[serde(rename = "linux-x64")]
+        linux_x64: Option<String>,
+        #[serde(rename = "win-x64")]
+        win_x64: Option<String>,
+    },
+}
+
 fn get_platform_asset_name() -> String {
     #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
     return "osx-arm64.zip".to_string();
@@ -66,18 +112,111 @@ pub enum UpdateEvent {
     Done,
 }
 
+/// 加载自定义更新源配置
+fn load_update_source_config() -> Option<UpdateSourceConfig> {
+    let config_path = crate::config::base_dir().join(UPDATE_SOURCE_CONFIG);
+    if !config_path.exists() {
+        return None;
+    }
+    
+    match fs::read_to_string(&config_path) {
+        Ok(content) => {
+            match serde_json::from_str::<UpdateSourceConfig>(&content) {
+                Ok(config) => {
+                    tracing::info!("使用自定义更新源配置");
+                    Some(config)
+                }
+                Err(e) => {
+                    tracing::warn!("解析更新源配置失败: {}", e);
+                    None
+                }
+            }
+        }
+        Err(e) => {
+            tracing::warn!("读取更新源配置失败: {}", e);
+            None
+        }
+    }
+}
+
+/// 获取 OpenUO 更新 URL
+fn get_openuo_update_url() -> String {
+    load_update_source_config()
+        .and_then(|c| c.openuo_url)
+        .unwrap_or_else(|| OPEN_UO_RELEASE_URL.to_string())
+}
+
+/// 获取 Launcher 更新 URL
+fn get_launcher_update_url() -> String {
+    load_update_source_config()
+        .and_then(|c| c.launcher_url)
+        .unwrap_or_else(|| LAUNCHER_RELEASE_URL.to_string())
+}
+
+/// 是否使用 GitHub API 格式
+fn use_github_format() -> bool {
+    load_update_source_config()
+        .map(|c| c.use_github_format)
+        .unwrap_or(true)
+}
+
 pub fn fetch_latest_release(url: &str) -> Result<GithubRelease> {
     let client = reqwest::blocking::Client::builder()
         .user_agent("Another-OpenUO-Launcher")
         .timeout(Duration::from_secs(8))
         .build()?;
-    let resp = client
-        .get(url)
-        .header("Accept", "application/vnd.github+json")
-        .send()?
-        .error_for_status()?
-        .json::<GithubRelease>()?;
-    Ok(resp)
+    
+    if use_github_format() {
+        // GitHub API 格式
+        let resp = client
+            .get(url)
+            .header("Accept", "application/vnd.github+json")
+            .send()?
+            .error_for_status()?
+            .json::<GithubRelease>()?;
+        Ok(resp)
+    } else {
+        // 简化格式，转换为 GithubRelease
+        let resp = client
+            .get(url)
+            .send()?
+            .error_for_status()?
+            .json::<SimpleRelease>()?;
+        
+        // 转换为 GithubRelease 格式
+        let platform_name = get_platform_asset_name();
+        let download_url = match resp.download_url {
+            DownloadUrls::Single(url) => url,
+            DownloadUrls::Multiple { osx_arm64, osx_x64, linux_x64, win_x64 } => {
+                #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+                let url = osx_arm64;
+                
+                #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+                let url = osx_x64;
+                
+                #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+                let url = linux_x64;
+                
+                #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
+                let url = win_x64;
+                
+                url.context("当前平台没有可用的下载链接")?
+            }
+        };
+        
+        Ok(GithubRelease {
+            tag_name: resp.version.clone(),
+            name: resp.version,
+            assets: vec![GithubAsset {
+                name: platform_name,
+                browser_download_url: download_url,
+                size: 0,
+            }],
+            body: None,
+            published_at: None,
+            target_commitish: None,
+        })
+    }
 }
 
 pub fn download_and_unpack_open_uo_with_progress<F: Fn(DownloadEvent) + Send + 'static>(
@@ -87,7 +226,8 @@ pub fn download_and_unpack_open_uo_with_progress<F: Fn(DownloadEvent) + Send + '
         progress(evt);
     };
 
-    let release = fetch_latest_release(OPEN_UO_RELEASE_URL)?;
+    let url = get_openuo_update_url();
+    let release = fetch_latest_release(&url)?;
     
     // 根据当前平台选择正确的资产
     let platform_name = get_platform_asset_name();
@@ -121,7 +261,8 @@ pub fn download_launcher_update<F: Fn(DownloadEvent) + Send + 'static>(
         progress(evt);
     };
 
-    let release = fetch_latest_release(LAUNCHER_RELEASE_URL)?;
+    let url = get_launcher_update_url();
+    let release = fetch_latest_release(&url)?;
     
     // 根据当前平台选择正确的可执行文件
     let launcher_name = get_launcher_asset_name();
@@ -297,13 +438,15 @@ pub fn trigger_update_check_impl(open_uo: bool, launcher: bool) -> mpsc::Receive
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
         if open_uo {
-            let res = fetch_latest_release(OPEN_UO_RELEASE_URL)
+            let url = get_openuo_update_url();
+            let res = fetch_latest_release(&url)
                 .map(|r| get_version_string(&r))
                 .map_err(|e| format!("{e:#}"));
             let _ = tx.send(UpdateEvent::OpenUO(res));
         }
         if launcher {
-            let res = fetch_latest_release(LAUNCHER_RELEASE_URL)
+            let url = get_launcher_update_url();
+            let res = fetch_latest_release(&url)
                 .map(|r| get_version_string(&r))
                 .map_err(|e| format!("{e:#}"));
             let _ = tx.send(UpdateEvent::Launcher(res));

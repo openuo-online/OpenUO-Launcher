@@ -1,0 +1,9 @@
+{
+  "version": "v0.1.0",
+  "download_url": {
+    "osx-arm64": "https://github.com/openuo-online/Another-OpenUO-Launcher/releases/download/v0.1.0/OpenUO-Launcher-macos-arm64",
+    "osx-x64": "https://github.com/openuo-online/Another-OpenUO-Launcher/releases/download/v0.1.0/OpenUO-Launcher-macos-x64",
+    "linux-x64": "https://github.com/openuo-online/Another-OpenUO-Launcher/releases/download/v0.1.0/OpenUO-Launcher-linux-x64",
+    "win-x64": "https://github.com/openuo-online/Another-OpenUO-Launcher/releases/download/v0.1.0/OpenUO-Launcher-windows-x64.exe"
+  }
+}

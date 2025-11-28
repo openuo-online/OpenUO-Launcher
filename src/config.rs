@@ -90,6 +90,13 @@ impl Default for ProfileConfig {
 pub fn new_profile(name: &str) -> ProfileConfig {
     let mut profile = ProfileConfig::default();
     profile.index.name = name.to_string();
+    
+    // 新建配置时，如果 UO 资源目录为空，默认设置为启动器所在目录
+    if profile.settings.ultima_online_directory.is_empty() {
+        let launcher_dir = base_dir();
+        profile.settings.ultima_online_directory = launcher_dir.to_string_lossy().to_string();
+    }
+    
     profile
 }
 
@@ -223,7 +230,7 @@ pub fn uo_data_path() -> String {
     client_path()
 }
 
-fn base_dir() -> PathBuf {
+pub fn base_dir() -> PathBuf {
     std::env::current_exe()
         .ok()
         .and_then(|p| p.parent().map(|p| p.to_path_buf()))
