@@ -179,10 +179,6 @@ pub struct OuoSettings {
     pub launcher_scale_factor: Option<f64>,
     #[serde(rename = "launcher_is_hidpi", skip_serializing_if = "Option::is_none")]
     pub launcher_is_hidpi: Option<bool>,
-    #[serde(rename = "launcher_lang", skip_serializing_if = "Option::is_none")]
-    pub launcher_lang: Option<String>,
-    #[serde(rename = "launcher_os", skip_serializing_if = "Option::is_none")]
-    pub launcher_os: Option<String>,
 }
 
 impl Default for OuoSettings {
@@ -221,9 +217,57 @@ impl Default for OuoSettings {
             launcher_screen_height: None,
             launcher_scale_factor: None,
             launcher_is_hidpi: None,
-            launcher_lang: None,
-            launcher_os: None,
         }
+    }
+}
+
+/// 将 Launcher 语言代码转换为 OpenUO 支持的语言代码
+/// 
+/// 支持的语言：
+/// - RUS (俄语)
+/// - FRA (法语)
+/// - DEU (德语)
+/// - ESP (西班牙语)
+/// - JPN (日语)
+/// - KOR (韩语)
+/// - PTB (葡萄牙语-巴西)
+/// - ITA (意大利语)
+/// - CHT (繁体中文/简体中文)
+/// - ENU (英语-美国)
+fn convert_launcher_lang_to_uo_lang(launcher_lang: &str) -> String {
+    match launcher_lang {
+        // 中文（简体和繁体都映射到 CHT）
+        "zh-CN" | "zh-TW" | "zh-HK" | "zh" => "CHT".to_string(),
+        
+        // 英语
+        "en" | "en-US" | "en-GB" => "ENU".to_string(),
+        
+        // 俄语
+        "ru" | "ru-RU" => "RUS".to_string(),
+        
+        // 法语
+        "fr" | "fr-FR" => "FRA".to_string(),
+        
+        // 德语
+        "de" | "de-DE" => "DEU".to_string(),
+        
+        // 西班牙语
+        "es" | "es-ES" => "ESP".to_string(),
+        
+        // 日语
+        "ja" | "ja-JP" => "JPN".to_string(),
+        
+        // 韩语
+        "ko" | "ko-KR" => "KOR".to_string(),
+        
+        // 葡萄牙语-巴西
+        "pt-BR" => "PTB".to_string(),
+        
+        // 意大利语
+        "it" | "it-IT" => "ITA".to_string(),
+        
+        // 不匹配的返回空字符串
+        _ => String::new(),
     }
 }
 
@@ -417,9 +461,23 @@ pub fn save_profile_with_screen_info(
         settings.launcher_screen_width = Some(info.width);
         settings.launcher_screen_height = Some(info.height);
         settings.launcher_scale_factor = Some(info.scale_factor);
-        settings.launcher_is_hidpi = Some(info.is_hidpi);
-        settings.launcher_lang = Some(info.lang.clone());
-        settings.launcher_os = Some(info.os.clone());
+        
+        // launcher_is_hidpi: 只有 scale_factor > 1 且系统为 macOS 时才设置为 true
+        #[cfg(target_os = "macos")]
+        {
+            settings.launcher_is_hidpi = Some(info.scale_factor > 1.0);
+        }
+        
+        #[cfg(not(target_os = "macos"))]
+        {
+            settings.launcher_is_hidpi = Some(false);
+        }
+        
+        // 转换 Launcher 语言代码为 OpenUO 支持的语言代码
+        let uo_lang = convert_launcher_lang_to_uo_lang(&info.lang);
+        if !uo_lang.is_empty() {
+            settings.language = uo_lang;
+        }
     }
     
     // 如果不保存账号，清空用户名和密码
@@ -441,9 +499,7 @@ pub struct ScreenInfo {
     pub width: u32,
     pub height: u32,
     pub scale_factor: f64,
-    pub is_hidpi: bool,
     pub lang: String,
-    pub os: String,
 }
 
 pub fn save_config(config: &LauncherConfig) -> Result<()> {
@@ -504,4 +560,37 @@ pub fn delete_profile(profile: &ProfileConfig) -> Result<()> {
 fn detect_client_version_from_uo_resources(_path: &str) -> Option<String> {
     // TODO: parse client.exe version when available
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_language_conversion() {
+        // 中文
+        assert_eq!(convert_launcher_lang_to_uo_lang("zh-CN"), "CHT");
+        assert_eq!(convert_launcher_lang_to_uo_lang("zh-TW"), "CHT");
+        assert_eq!(convert_launcher_lang_to_uo_lang("zh-HK"), "CHT");
+        assert_eq!(convert_launcher_lang_to_uo_lang("zh"), "CHT");
+        
+        // 英语
+        assert_eq!(convert_launcher_lang_to_uo_lang("en"), "ENU");
+        assert_eq!(convert_launcher_lang_to_uo_lang("en-US"), "ENU");
+        assert_eq!(convert_launcher_lang_to_uo_lang("en-GB"), "ENU");
+        
+        // 其他语言
+        assert_eq!(convert_launcher_lang_to_uo_lang("ru"), "RUS");
+        assert_eq!(convert_launcher_lang_to_uo_lang("fr"), "FRA");
+        assert_eq!(convert_launcher_lang_to_uo_lang("de"), "DEU");
+        assert_eq!(convert_launcher_lang_to_uo_lang("es"), "ESP");
+        assert_eq!(convert_launcher_lang_to_uo_lang("ja"), "JPN");
+        assert_eq!(convert_launcher_lang_to_uo_lang("ko"), "KOR");
+        assert_eq!(convert_launcher_lang_to_uo_lang("pt-BR"), "PTB");
+        assert_eq!(convert_launcher_lang_to_uo_lang("it"), "ITA");
+        
+        // 不支持的语言返回空字符串
+        assert_eq!(convert_launcher_lang_to_uo_lang("unknown"), "");
+        assert_eq!(convert_launcher_lang_to_uo_lang("ar"), "");
+    }
 }

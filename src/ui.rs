@@ -851,9 +851,7 @@ impl LauncherUi {
             width,
             height,
             scale_factor,
-            is_hidpi: scale_factor > 1.0,
             lang: crate::i18n::current_locale(),
-            os: crate::system_info::os_name(),
         });
     }
 
