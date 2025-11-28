@@ -10,6 +10,7 @@ mod encryption_helper;
 mod github;
 mod i18n;
 mod profile_editor;
+mod system_info;
 mod ui;
 mod version_reader;
 
@@ -69,8 +70,11 @@ fn get_primary_screen_size() -> (u32, u32) {
 fn main() -> Result<()> {
     init_tracing();
     
-    // 初始化国际化
-    i18n::init_locale();
+    // 加载保存的语言设置
+    let launcher_settings = config::load_launcher_settings();
+    
+    // 初始化国际化（优先使用保存的语言）
+    i18n::init_locale_with_saved(launcher_settings.language);
     
     pollster::block_on(run())
 }

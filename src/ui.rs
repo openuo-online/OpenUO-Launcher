@@ -9,16 +9,42 @@ use crate::github::*;
 use crate::i18n::t;
 use crate::profile_editor::ProfileEditor;
 
+/// 日志条目类型
+#[derive(Debug, Clone)]
+pub enum LogEntryType {
+    Info,
+    Success,
+    Warning,
+    Error,
+    Checking,
+}
+
+/// 日志条目
+#[derive(Debug, Clone)]
+pub struct LogEntry {
+    pub timestamp: Instant,
+    pub entry_type: LogEntryType,
+    pub message: String,
+    pub action: Option<LogAction>,
+}
+
+/// 日志关联的操作
+#[derive(Debug, Clone)]
+pub enum LogAction {
+    UpdateLauncher,
+    UpdateOpenUO,
+    RetryDownload,
+}
+
 pub struct LauncherUi {
     pub config: LauncherConfig,
-    pub status: String,
     pub profile_editor: ProfileEditor,
     pub open_uo_version: Option<String>,
     pub launcher_version: String,
     pub download_rx: Option<mpsc::Receiver<DownloadEvent>>,
     pub download_progress: Option<(u64, u64)>,
-    pub downloading_launcher: bool, // 标记是否正在下载 Launcher
-    pub launcher_restarting: bool, // 标记 Launcher 正在重启
+    pub downloading_launcher: bool,
+    pub launcher_restarting: bool,
     pub update_rx: Option<mpsc::Receiver<UpdateEvent>>,
     pub remote_open_uo: Option<String>,
     pub remote_launcher: Option<String>,
@@ -29,13 +55,14 @@ pub struct LauncherUi {
     pub logo_texture: Option<egui::TextureHandle>,
     pub screen_info: Option<ScreenInfo>,
     pub current_locale: String,
+    pub logs: Vec<LogEntry>,
+    pub download_failed: bool,
 }
 
 impl LauncherUi {
     pub fn new(config: LauncherConfig) -> Self {
         Self {
             config,
-            status: format!("{}", t!("status.config_loaded").to_string()),
             profile_editor: ProfileEditor::new(),
             open_uo_version: detect_open_uo_version(),
             launcher_version: format!("v{}", env!("CARGO_PKG_VERSION")),
@@ -53,6 +80,8 @@ impl LauncherUi {
             background_texture: None,
             logo_texture: None,
             current_locale: crate::i18n::current_locale().to_string(),
+            logs: Vec::new(),
+            download_failed: false,
         }
     }
 
@@ -99,32 +128,54 @@ impl LauncherUi {
 
                 paint_background(ui, &self.background_texture, &self.logo_texture);
                 
-                // 添加左边距和上边距，与 logo 对齐
                 let margin = 12.0;
-                ui.add_space(margin);
+                let available_rect = ui.available_rect_before_wrap();
+                let footer_height = 30.0;
                 
-                ui.horizontal(|ui| {
+                // 主内容区域
+                let content_rect = egui::Rect::from_min_size(
+                    available_rect.min,
+                    egui::vec2(available_rect.width(), available_rect.height() - footer_height)
+                );
+                
+                let mut content_ui = ui.child_ui(content_rect, egui::Layout::top_down(egui::Align::Min));
+                content_ui.add_space(margin);
+                
+                content_ui.horizontal(|ui| {
                     ui.add_space(margin);
+                    
                     ui.vertical(|ui| {
+                        // 标题
                         ui.heading(RichText::new(t!("window.title")).size(24.0).strong());
                         ui.add_space(12.0);
 
+                        // 语言选择
                         self.show_language_selector(ui);
                         ui.add_space(8.0);
+                        
+                        // 配置选择
                         self.show_profile_selector(ui);
                         ui.add_space(8.0);
-                        self.show_version_info(ui);
-                        ui.add_space(8.0);
+                        
+                        // 启动按钮
                         self.show_launch_button(ui);
-                        ui.add_space(10.0);
-
-                        ui.label(
-                            RichText::new(&self.status)
-                                .italics()
-                                .color(egui::Color32::LIGHT_GRAY),
-                        );
+                        ui.add_space(12.0);
+                        
+                        // 日志区域
+                        self.show_log_area(ui);
                     });
+                    
+                    ui.add_space(margin);
                 });
+                
+                // 底部信息栏（固定在底部）
+                let footer_rect = egui::Rect::from_min_size(
+                    egui::pos2(available_rect.min.x, available_rect.max.y - footer_height),
+                    egui::vec2(available_rect.width(), footer_height)
+                );
+                
+                let mut footer_ui = ui.child_ui(footer_rect, egui::Layout::top_down(egui::Align::Min));
+                self.show_footer(&mut footer_ui);
             });
     }
 
@@ -153,6 +204,12 @@ impl LauncherUi {
                             if ui.selectable_label(is_selected, &lang.native_name).clicked() {
                                 self.current_locale = lang.code.clone();
                                 crate::i18n::set_locale(&lang.code);
+                                
+                                // 保存用户选择的语言
+                                self.config.launcher_settings.language = Some(lang.code.clone());
+                                if let Err(e) = save_launcher_settings(&self.config.launcher_settings) {
+                                    tracing::warn!("Failed to save language setting: {}", e);
+                                }
                             }
                         }
                     });
@@ -359,37 +416,152 @@ impl LauncherUi {
                 
                 if ui.add(launch_btn).clicked() {
                     match self.launch_open_uo() {
-                        Ok(msg) => self.set_status(&msg),
-                        Err(_err) => self.set_status(&t!("status.launch_failed")),
+                        Ok(msg) => self.add_log(LogEntryType::Success, &msg, None),
+                        Err(err) => self.add_log(LogEntryType::Error, &format!("✗ {}: {}", t!("status.launch_failed"), err), None),
                     }
                 }
             });
         });
     }
 
+    fn show_footer(&mut self, ui: &mut egui::Ui) {
+        // 添加半透明背景
+        let footer_frame = egui::Frame::none()
+            .fill(egui::Color32::from_rgba_unmultiplied(0, 0, 0, 120))
+            .inner_margin(egui::Margin::symmetric(12.0, 6.0));
+        
+        footer_frame.show(ui, |ui| {
+            ui.horizontal(|ui| {
+                // 左侧：OpenUO 版本
+                let openuo_version = self.open_uo_version.as_deref().unwrap_or("N/A");
+                ui.label(
+                    RichText::new(format!("OpenUO: {}", openuo_version))
+                        .size(11.0)
+                        .color(egui::Color32::from_rgb(180, 180, 180))
+                );
+                
+                ui.separator();
+                
+                // 中间：语言和操作系统
+                let system_info = crate::system_info::system_info_string();
+                let languages = crate::i18n::available_languages();
+                let current_lang = languages
+                    .iter()
+                    .find(|lang| lang.code == self.current_locale)
+                    .map(|lang| lang.native_name.as_str())
+                    .unwrap_or(&self.current_locale);
+                
+                ui.label(
+                    RichText::new(format!("{} | {}", current_lang, system_info))
+                        .size(11.0)
+                        .color(egui::Color32::from_rgb(160, 160, 160))
+                );
+                
+                // 右侧：Launcher 版本
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.label(
+                        RichText::new(format!("Launcher: {}", self.launcher_version))
+                            .size(11.0)
+                            .color(egui::Color32::from_rgb(180, 180, 180))
+                    );
+                });
+            });
+        });
+    }
+
     fn poll_channels(&mut self) {
-        poll_download_channel(
-            &mut self.download_rx,
-            &mut self.download_progress,
-            &mut self.downloading_launcher,
-            &mut self.launcher_restarting,
-            &mut self.status,
-            &mut self.open_uo_version,
-        );
-        poll_update_channel(
-            &mut self.update_rx,
-            &mut self.remote_open_uo,
-            &mut self.remote_launcher,
-            &mut self.status,
-            &mut self.checking_open_uo,
-            &mut self.checking_launcher,
-        );
+        // 处理下载事件
+        if let Some(rx) = &self.download_rx {
+            let events: Vec<_> = rx.try_iter().collect();
+            for event in events {
+                match event {
+                    DownloadEvent::Progress { received, total } => {
+                        self.download_progress = Some((received, total));
+                    }
+                    DownloadEvent::Finished(result) => {
+                        self.download_rx = None;
+                        self.download_progress = None;
+                        
+                        match result {
+                            Ok(tag) => {
+                                if tag.starts_with("UPDATE_AND_RESTART:") {
+                                    let version = tag.strip_prefix("UPDATE_AND_RESTART:").unwrap_or("");
+                                    self.add_log(LogEntryType::Success, &format!("✅ {}", t!("log.launcher_update_complete", version = version)), None);
+                                    self.launcher_restarting = true;
+                                    std::thread::spawn(|| {
+                                        std::thread::sleep(std::time::Duration::from_secs(2));
+                                        std::process::exit(0);
+                                    });
+                                } else {
+                                    self.open_uo_version = Some(tag.clone());
+                                    self.add_log(LogEntryType::Success, &format!("✓ {}", t!("log.openuo_download_complete", version = &tag)), None);
+                                }
+                                self.downloading_launcher = false;
+                                self.download_failed = false;
+                            }
+                            Err(err) => {
+                                self.add_log(LogEntryType::Error, &format!("✗ {}: {}", t!("log.download_error"), err), Some(LogAction::RetryDownload));
+                                self.downloading_launcher = false;
+                                self.download_failed = true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 处理更新检查事件
+        if let Some(rx) = &self.update_rx {
+            let events: Vec<_> = rx.try_iter().collect();
+            for event in events {
+                match event {
+                    UpdateEvent::OpenUO(res) => {
+                        self.checking_open_uo = false;
+                        match res {
+                            Ok(v) => {
+                                self.remote_open_uo = Some(v.clone());
+                                if let Some(local) = &self.open_uo_version {
+                                    if &v != local {
+                                        self.add_log(LogEntryType::Info, &format!("{}: {}", t!("log.openuo_new_version"), v), Some(LogAction::UpdateOpenUO));
+                                    } else {
+                                        self.add_log(LogEntryType::Success, &format!("✓ {}: {}", t!("log.openuo_latest"), v), None);
+                                    }
+                                } else {
+                                    self.add_log(LogEntryType::Info, &format!("{}: {}", t!("log.openuo_not_installed"), v), Some(LogAction::UpdateOpenUO));
+                                }
+                            }
+                            Err(e) => {
+                                self.add_log(LogEntryType::Error, &format!("✗ {}: {}", t!("log.openuo_check_error"), e), None);
+                            }
+                        }
+                    }
+                    UpdateEvent::Launcher(res) => {
+                        self.checking_launcher = false;
+                        match res {
+                            Ok(v) => {
+                                self.remote_launcher = Some(v.clone());
+                                if v != self.launcher_version {
+                                    self.add_log(LogEntryType::Info, &format!("{}: {}", t!("log.launcher_new_version"), v), Some(LogAction::UpdateLauncher));
+                                } else {
+                                    self.add_log(LogEntryType::Success, &format!("✓ {}: {}", t!("log.launcher_latest"), v), None);
+                                }
+                            }
+                            Err(e) => {
+                                self.add_log(LogEntryType::Error, &format!("✗ {}: {}", t!("log.launcher_check_error"), e), None);
+                            }
+                        }
+                    }
+                    UpdateEvent::Done => {}
+                }
+            }
+        }
     }
 
     fn start_download(&mut self) {
         if self.download_rx.is_some() {
             return;
         }
+        self.add_log(LogEntryType::Info, &format!("⏳ {}", t!("log.downloading_openuo")), None);
         let (tx, rx) = mpsc::channel();
         let tx_progress = tx.clone();
         std::thread::spawn(move || {
@@ -400,13 +572,14 @@ impl LauncherUi {
         });
         self.download_rx = Some(rx);
         self.download_progress = None;
-        self.downloading_launcher = false; // 标记正在下载 OpenUO
+        self.downloading_launcher = false;
     }
 
     fn start_launcher_update(&mut self) {
         if self.download_rx.is_some() {
             return;
         }
+        self.add_log(LogEntryType::Info, &format!("⏳ {}", t!("log.downloading_launcher")), None);
         let (tx, rx) = mpsc::channel();
         let tx_progress = tx.clone();
         std::thread::spawn(move || {
@@ -417,8 +590,7 @@ impl LauncherUi {
         });
         self.download_rx = Some(rx);
         self.download_progress = None;
-        self.downloading_launcher = true; // 标记正在下载 Launcher
-        self.set_status(&t!("status.launcher_update_downloading"));
+        self.downloading_launcher = true;
     }
 
     fn trigger_update_checks(&mut self, open_uo: bool, launcher: bool) {
@@ -427,9 +599,11 @@ impl LauncherUi {
         }
         if open_uo && !self.checking_open_uo {
             self.checking_open_uo = true;
+            self.add_log(LogEntryType::Checking, &format!("⟳ {}", t!("log.checking_openuo")), None);
         }
         if launcher && !self.checking_launcher {
             self.checking_launcher = true;
+            self.add_log(LogEntryType::Checking, &format!("⟳ {}", t!("log.checking_launcher")), None);
         }
         self.last_update_poll = Instant::now();
         self.update_rx = Some(trigger_update_check_impl(open_uo, launcher));
@@ -541,7 +715,135 @@ impl LauncherUi {
     }
 
     pub fn set_status(&mut self, msg: &str) {
-        self.status = msg.to_string();
+        // 已废弃，使用 add_log 代替
+        self.add_log(LogEntryType::Info, msg, None);
+    }
+    
+    /// 添加日志条目
+    pub fn add_log(&mut self, entry_type: LogEntryType, message: &str, action: Option<LogAction>) {
+        self.logs.push(LogEntry {
+            timestamp: Instant::now(),
+            entry_type,
+            message: message.to_string(),
+            action,
+        });
+        
+        // 限制日志数量，保留最近 50 条
+        if self.logs.len() > 50 {
+            self.logs.remove(0);
+        }
+    }
+    
+    /// 显示日志区域
+    fn show_log_area(&mut self, ui: &mut egui::Ui) {
+        // 限制日志区域宽度为可用宽度的 70%
+        let max_width = ui.available_width() * 0.7;
+        
+        ui.vertical(|ui| {
+            ui.set_max_width(max_width);
+            ui.set_min_height(200.0);
+            ui.set_max_height(300.0);
+            
+            egui::ScrollArea::vertical()
+                .auto_shrink([false, false])
+                .show(ui, |ui| {
+                    ui.set_max_width(max_width);
+                    
+                    if self.logs.is_empty() {
+                        ui.label(
+                            RichText::new(t!("log.ready"))
+                                .size(12.0)
+                                .color(egui::Color32::from_rgb(150, 150, 150))
+                        );
+                    } else {
+                        let logs = self.logs.clone();
+                        for log in &logs {
+                            self.show_log_entry(ui, log);
+                        }
+                    }
+                });
+        });
+    }
+    
+    /// 显示单个日志条目
+    fn show_log_entry(&mut self, ui: &mut egui::Ui, log: &LogEntry) {
+        ui.horizontal_wrapped(|ui| {
+            // 图标和颜色
+            let (icon, color) = match log.entry_type {
+                LogEntryType::Info => ("ℹ", egui::Color32::from_rgb(150, 150, 200)),
+                LogEntryType::Success => ("✓", egui::Color32::from_rgb(100, 200, 100)),
+                LogEntryType::Warning => ("⚠", egui::Color32::from_rgb(200, 200, 100)),
+                LogEntryType::Error => ("✗", egui::Color32::from_rgb(200, 100, 100)),
+                LogEntryType::Checking => ("⟳", egui::Color32::from_rgb(150, 150, 200)),
+            };
+            
+            ui.label(RichText::new(icon).size(14.0).color(color));
+            
+            // 使用 wrap 模式显示文本，自动换行
+            ui.label(
+                RichText::new(&log.message)
+                    .size(12.0)
+                    .color(egui::Color32::from_rgb(200, 200, 200))
+            );
+            
+            // 显示操作按钮
+            if let Some(action) = &log.action {
+                match action {
+                    LogAction::UpdateLauncher => {
+                        if !self.downloading_launcher && !self.launcher_restarting {
+                            let btn = egui::Button::new("🔄 更新")
+                                .fill(egui::Color32::from_rgb(80, 120, 200))
+                                .min_size(egui::vec2(60.0, 20.0));
+                            if ui.add(btn).clicked() {
+                                self.start_launcher_update();
+                            }
+                        }
+                    }
+                    LogAction::UpdateOpenUO => {
+                        if self.download_rx.is_none() {
+                            let btn = egui::Button::new("🔄 更新")
+                                .fill(egui::Color32::from_rgb(80, 120, 200))
+                                .min_size(egui::vec2(60.0, 20.0));
+                            if ui.add(btn).clicked() {
+                                self.start_download();
+                            }
+                        }
+                    }
+                    LogAction::RetryDownload => {
+                        if self.download_rx.is_none() {
+                            let btn = egui::Button::new("🔄 重试")
+                                .fill(egui::Color32::from_rgb(200, 120, 80))
+                                .min_size(egui::vec2(60.0, 20.0));
+                            if ui.add(btn).clicked() {
+                                self.download_failed = false;
+                                if self.downloading_launcher {
+                                    self.start_launcher_update();
+                                } else {
+                                    self.start_download();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        
+        // 显示下载进度条
+        if let Some((cur, total)) = self.download_progress {
+            if total > 0 {
+                let progress = (cur as f32) / (total as f32);
+                let total_mb = (total as f32) / (1024.0 * 1024.0);
+                let cur_mb = (cur as f32) / (1024.0 * 1024.0);
+                
+                ui.add(
+                    egui::ProgressBar::new(progress)
+                        .text(format!("{:.1}/{:.1} MB", cur_mb, total_mb))
+                        .desired_width(ui.available_width() - 30.0)
+                );
+            }
+        }
+        
+        ui.add_space(4.0);
     }
 
     pub fn set_screen_info(&mut self, width: u32, height: u32, scale_factor: f64) {

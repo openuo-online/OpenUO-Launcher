@@ -68,15 +68,43 @@ pub fn set_locale(locale: &str) {
 }
 
 /// 根据系统语言自动初始化
+/// 优先级：保存的语言设置 > 系统语言 > 默认语言
 pub fn init_locale() {
-    let system_locale = sys_locale::get_locale().unwrap_or_else(|| "en".to_string());
+    init_locale_with_saved(None)
+}
+
+/// 使用保存的语言设置初始化
+pub fn init_locale_with_saved(saved_language: Option<String>) {
+    let system_locale = detect_system_locale();
     
     // 获取可用语言列表
     let available = available_languages();
     let default = default_language();
     
-    // 尝试匹配系统语言
-    let locale = available
+    // 优先使用保存的语言设置
+    let locale = if let Some(ref saved) = saved_language {
+        // 验证保存的语言是否有效
+        if available.iter().any(|lang| lang.code == *saved) {
+            tracing::info!("{}: {}", t!("log.using_saved_language"), saved);
+            saved.clone()
+        } else {
+            // 保存的语言无效，使用系统语言
+            match_system_locale(&system_locale, &available, &default)
+        }
+    } else {
+        // 没有保存的语言，使用系统语言
+        match_system_locale(&system_locale, &available, &default)
+    };
+    
+    rust_i18n::set_locale(&locale);
+    if saved_language.is_none() {
+        tracing::info!("{}: {}, {}: {}", t!("log.system_language"), system_locale, t!("log.using_language"), locale);
+    }
+}
+
+/// 匹配系统语言
+fn match_system_locale(system_locale: &str, available: &[LanguageInfo], default: &str) -> String {
+    available
         .iter()
         .find(|lang| {
             // 精确匹配
@@ -92,10 +120,66 @@ pub fn init_locale() {
             false
         })
         .map(|lang| lang.code.clone())
-        .unwrap_or(default);
+        .unwrap_or_else(|| default.to_string())
+}
+
+/// 检测系统语言（带回退机制）
+fn detect_system_locale() -> String {
+    // 方法 1: 使用 sys-locale（读取环境变量）
+    if let Some(locale) = sys_locale::get_locale() {
+        // 如果检测到的不是 "C" 或 "POSIX"（这些是默认值，不代表真实语言）
+        if locale != "C" && locale != "POSIX" {
+            return locale;
+        }
+    }
     
-    rust_i18n::set_locale(&locale);
-    tracing::info!("{}: {}, {}: {}", t!("log.system_language"), system_locale, t!("log.using_language"), locale);
+    // 方法 2: 在 macOS 上，尝试读取系统偏好设置
+    #[cfg(target_os = "macos")]
+    {
+        if let Some(locale) = detect_macos_locale() {
+            return locale;
+        }
+    }
+    
+    // 方法 3: 在 Windows 上，使用系统 API
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(locale) = detect_windows_locale() {
+            return locale;
+        }
+    }
+    
+    // 默认英语
+    "en".to_string()
+}
+
+/// macOS 特定：从系统偏好设置读取语言
+#[cfg(target_os = "macos")]
+fn detect_macos_locale() -> Option<String> {
+    use std::process::Command;
+    
+    // 使用 defaults 命令读取系统语言
+    let output = Command::new("defaults")
+        .args(&["read", "-g", "AppleLocale"])
+        .output()
+        .ok()?;
+    
+    if output.status.success() {
+        let locale = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if !locale.is_empty() {
+            return Some(locale);
+        }
+    }
+    
+    None
+}
+
+/// Windows 特定：从系统 API 读取语言
+#[cfg(target_os = "windows")]
+fn detect_windows_locale() -> Option<String> {
+    // Windows 上 sys-locale 已经很准确了，这里只是占位
+    // 如果需要更精确的检测，可以使用 Windows API
+    None
 }
 
 // 重新导出 t! 宏，方便使用

@@ -6,6 +6,7 @@ use std::path::PathBuf;
 
 const PROFILES_DIR: &str = "Profiles";
 const SETTINGS_DIR: &str = "Profiles/Settings";
+const LAUNCHER_SETTINGS_FILENAME: &str = ".launcher_language";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LauncherConfig {
@@ -13,6 +14,16 @@ pub struct LauncherConfig {
     pub profiles: Vec<ProfileConfig>,
     #[serde(skip)]
     pub active_profile: usize,
+    #[serde(skip)]
+    pub launcher_settings: LauncherSettings,
+}
+
+// Launcher 全局设置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct LauncherSettings {
+    #[serde(rename = "language")]
+    pub language: Option<String>,
 }
 
 impl Default for LauncherConfig {
@@ -20,6 +31,15 @@ impl Default for LauncherConfig {
         Self {
             profiles: Vec::new(),
             active_profile: 0,
+            launcher_settings: LauncherSettings::default(),
+        }
+    }
+}
+
+impl Default for LauncherSettings {
+    fn default() -> Self {
+        Self {
+            language: None,
         }
     }
 }
@@ -241,6 +261,10 @@ pub fn settings_dir() -> PathBuf {
     base_dir().join(SETTINGS_DIR)
 }
 
+pub fn launcher_settings_path() -> PathBuf {
+    base_dir().join(LAUNCHER_SETTINGS_FILENAME)
+}
+
 pub fn profile_index_path(profile: &ProfileConfig) -> PathBuf {
     profiles_dir().join(format!("{}.json", profile.index.file_name))
 }
@@ -252,6 +276,9 @@ pub fn profile_settings_path(profile: &ProfileConfig) -> PathBuf {
 // Config loading and saving
 pub fn load_config_from_disk() -> LauncherConfig {
     let mut config = LauncherConfig::default();
+    
+    // 加载 Launcher 全局设置
+    config.launcher_settings = load_launcher_settings();
     
     // 扫描 Profiles 目录加载所有档案
     let profiles_path = profiles_dir();
@@ -407,7 +434,40 @@ pub fn save_config(config: &LauncherConfig) -> Result<()> {
     for profile in &config.profiles {
         save_profile(profile)?;
     }
+    // 保存 Launcher 设置
+    save_launcher_settings(&config.launcher_settings)?;
     Ok(())
+}
+
+/// 保存 Launcher 全局设置（只保存语言到简单文本文件）
+pub fn save_launcher_settings(settings: &LauncherSettings) -> Result<()> {
+    let settings_path = launcher_settings_path();
+    if let Some(lang) = &settings.language {
+        fs::write(&settings_path, lang)?;
+    } else {
+        // 如果语言为 None，删除文件
+        if settings_path.exists() {
+            fs::remove_file(&settings_path).ok();
+        }
+    }
+    Ok(())
+}
+
+/// 加载 Launcher 全局设置（从简单文本文件读取语言）
+pub fn load_launcher_settings() -> LauncherSettings {
+    let settings_path = launcher_settings_path();
+    let language = if let Ok(content) = fs::read_to_string(&settings_path) {
+        let lang = content.trim().to_string();
+        if !lang.is_empty() {
+            Some(lang)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    
+    LauncherSettings { language }
 }
 
 pub fn delete_profile(profile: &ProfileConfig) -> Result<()> {
