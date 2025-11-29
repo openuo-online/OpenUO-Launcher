@@ -6,7 +6,8 @@ A modern OpenUO launcher written in Rust, with HiDPI display support and automat
 
 [OpenUO](https://github.com/openuo-online/OpenUO) is a fork of TazUO with Chinese localization and enhanced user experience improvements, designed to work seamlessly with this launcher.
 
-<img width="1072" height="744" alt="image" src="https://github.com/user-attachments/assets/a8133599-4faa-43c2-b8df-d696a9ef7cc0" />
+<img width="1072" height="744" alt="image" src="https://github.com/user-attachments/assets/3bdcfc46-ceb7-4b53-bac1-be1387db0f6f" />
+
 
 ## ✨ Features
 
