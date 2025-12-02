@@ -27,6 +27,24 @@ use winit::window::WindowBuilder;
 use config::load_config_from_disk;
 use ui::LauncherUi;
 
+#[cfg(target_os = "windows")]
+const APP_USER_MODEL_ID: &str = "OpenUO.Launcher";
+
+#[cfg(target_os = "windows")]
+fn set_windows_app_id() {
+    use windows::core::PCWSTR;
+    use windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID;
+
+    // Ensures the taskbar uses our icon and groups correctly.
+    let id: Vec<u16> = APP_USER_MODEL_ID
+        .encode_utf16()
+        .chain(std::iter::once(0))
+        .collect();
+    unsafe {
+        let _ = SetCurrentProcessExplicitAppUserModelID(PCWSTR(id.as_ptr()));
+    }
+}
+
 fn init_tracing() {
     let _ = tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
@@ -69,6 +87,8 @@ fn get_primary_screen_size() -> (u32, u32) {
 
 fn main() -> Result<()> {
     init_tracing();
+    #[cfg(target_os = "windows")]
+    set_windows_app_id();
     
     // 加载保存的语言设置
     let launcher_settings = config::load_launcher_settings();
@@ -88,11 +108,13 @@ async fn run() -> Result<()> {
     let mut window_builder = WindowBuilder::new()
         .with_title("OpenUO Launcher")
         .with_inner_size(LogicalSize::new(960.0, 600.0))
-        .with_min_inner_size(LogicalSize::new(720.0, 480.0));
+        .with_min_inner_size(LogicalSize::new(720.0, 480.0))
+        .with_window_icon(window_icon.clone());
     
-    // 设置窗口图标（如果加载成功）
-    if let Some(icon) = window_icon {
-        window_builder = window_builder.with_window_icon(Some(icon));
+    // Windows: create hidden first to avoid white flash and help taskbar icon apply
+    #[cfg(target_os = "windows")]
+    {
+        window_builder = window_builder.with_visible(false);
     }
     
     let window = Arc::new(
@@ -100,6 +122,14 @@ async fn run() -> Result<()> {
             .build(&event_loop)
             .context("Failed to create window")?,
     );
+
+    #[cfg(target_os = "windows")]
+    {
+        use winit::platform::windows::WindowExtWindows;
+        if let Some(icon) = window_icon.clone() {
+            window.set_taskbar_icon(Some(icon));
+        }
+    }
 
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
         backends: wgpu::Backends::all(),
@@ -198,6 +228,13 @@ async fn run() -> Result<()> {
     let (screen_width, screen_height) = get_primary_screen_size();
     
     ui.set_screen_info(screen_width, screen_height, scale_factor);
+    
+    // Windows: show window after resources/icons are ready to avoid white flash and help taskbar icon display
+    #[cfg(target_os = "windows")]
+    {
+        window.set_visible(true);
+        window.request_redraw();
+    }
     info!(
         "{}: {}x{} @ {:.2}x scale (HiDPI: {})",
         i18n::t!("log.screen_info"),

@@ -59,6 +59,25 @@ pub struct LauncherUi {
     pub download_failed: bool,
 }
 
+fn version_newer(remote: &str, local: &str) -> bool {
+    let parse = |s: &str| -> Vec<u32> {
+        s.split(|c| c == '.' || c == '-')
+            .filter_map(|p| p.parse::<u32>().ok())
+            .collect()
+    };
+    let r = parse(remote);
+    let l = parse(local);
+    let len = r.len().max(l.len());
+    for i in 0..len {
+        let rv = *r.get(i).unwrap_or(&0);
+        let lv = *l.get(i).unwrap_or(&0);
+        if rv != lv {
+            return rv > lv;
+        }
+    }
+    false
+}
+
 impl LauncherUi {
     pub fn new(config: LauncherConfig) -> Self {
         Self {
@@ -284,7 +303,7 @@ impl LauncherUi {
             };
             let launcher_version = self.launcher_version.clone();
             let has_update = self.remote_launcher.as_ref()
-                .map(|r| r != &launcher_version && !self.checking_launcher)
+                .map(|r| version_newer(r, &launcher_version) && !self.checking_launcher)
                 .unwrap_or(false);
             
             ui.horizontal(|ui| {
@@ -294,50 +313,36 @@ impl LauncherUi {
                     t!("version.launcher_remote"), launcher_remote
                 ));
                 
-                // 检查是否有新版本或正在下载或正在重启
-                if has_update || self.downloading_launcher || self.launcher_restarting {
-                    let is_busy = self.downloading_launcher || self.launcher_restarting;
-                    let btn_text = if self.launcher_restarting {
-                        t!("version.restarting").to_string()
-                    } else if self.downloading_launcher {
-                        t!("version.updating").to_string()
-                    } else {
-                        t!("version.update_launcher").to_string()
-                    };
-                    
-                    let btn_color = if is_busy {
-                        egui::Color32::from_rgba_unmultiplied(100, 100, 100, 200)
-                    } else {
-                        egui::Color32::from_rgba_unmultiplied(200, 100, 50, 200)
-                    };
-                    
-                    let mut update_btn = egui::Button::new(btn_text)
-                        .fill(btn_color)
+                let is_busy = self.downloading_launcher || self.launcher_restarting;
+
+                // 更新过程中，显示状态提示；正常时显示按钮
+                if has_update && !is_busy {
+                    let update_btn = egui::Button::new(t!("version.update_launcher"))
+                        .fill(egui::Color32::from_rgba_unmultiplied(200, 100, 50, 200))
                         .min_size(egui::vec2(100.0, 24.0));
-                    
-                    // 下载中或重启中时禁用按钮
-                    if is_busy {
-                        update_btn = update_btn.sense(egui::Sense::hover());
-                    }
-                    
-                    if ui.add(update_btn).clicked() && !is_busy {
+
+                    if ui.add(update_btn).clicked() {
                         self.start_launcher_update();
                     }
-                    
-                    // 显示下载进度（仅当正在下载 Launcher 时）
-                    if self.downloading_launcher {
-                        if let Some((cur, total)) = self.download_progress {
-                            if total > 0 {
-                                let progress = (cur as f32) / (total as f32);
-                                let total_mb = (total as f32) / (1024.0 * 1024.0);
-                                let cur_mb = (cur as f32) / (1024.0 * 1024.0);
-                                
-                                ui.add(
-                                    egui::ProgressBar::new(progress)
-                                        .text(format!("{:.1}/{:.1} MB", cur_mb, total_mb))
-                                        .desired_width(150.0)
-                                );
-                            }
+                } else if self.launcher_restarting {
+                    ui.label(RichText::new(t!("version.restarting")).color(egui::Color32::from_rgb(180, 180, 180)));
+                } else if self.downloading_launcher {
+                    ui.label(RichText::new(t!("version.updating")).color(egui::Color32::from_rgb(180, 180, 180)));
+                }
+
+                // 显示下载进度，只在下载 Launcher 时显示
+                if self.downloading_launcher {
+                    if let Some((cur, total)) = self.download_progress {
+                        if total > 0 {
+                            let progress = (cur as f32) / (total as f32);
+                            let total_mb = (total as f32) / (1024.0 * 1024.0);
+                            let cur_mb = (cur as f32) / (1024.0 * 1024.0);
+
+                            ui.add(
+                                egui::ProgressBar::new(progress)
+                                    .text(format!("{:.1}/{:.1} MB", cur_mb, total_mb))
+                                    .desired_width(150.0)
+                            );
                         }
                     }
                 }
@@ -360,7 +365,7 @@ impl LauncherUi {
                 
                 // 判断是否需要显示下载/更新按钮
                 let has_openuo_update = self.remote_open_uo.as_ref()
-                    .and_then(|remote| self.open_uo_version.as_ref().map(|local| remote != local))
+                    .and_then(|remote| self.open_uo_version.as_ref().map(|local| version_newer(remote, local)))
                     .unwrap_or(false);
                 
                 let is_downloading_openuo = !self.downloading_launcher && self.download_rx.is_some();
@@ -492,6 +497,8 @@ impl LauncherUi {
                                 if tag.starts_with("UPDATE_AND_RESTART:") {
                                     let version = tag.strip_prefix("UPDATE_AND_RESTART:").unwrap_or("");
                                     self.add_log(LogEntryType::Success, &format!("✅ {}", t!("log.launcher_update_complete", version = version)), None);
+                                    // 更新成功后同步远程版本，避免按钮残留
+                                    self.remote_launcher = Some(self.launcher_version.clone());
                                     self.launcher_restarting = true;
                                     std::thread::spawn(|| {
                                         std::thread::sleep(std::time::Duration::from_secs(2));
@@ -526,10 +533,11 @@ impl LauncherUi {
                             Ok(v) => {
                                 self.remote_open_uo = Some(v.clone());
                                 if let Some(local) = &self.open_uo_version {
-                                    if &v != local {
+                                    if version_newer(&v, local) {
                                         self.add_log(LogEntryType::Info, &format!("{}: {}", t!("log.openuo_new_version"), v), Some(LogAction::UpdateOpenUO));
                                     } else {
                                         self.add_log(LogEntryType::Success, &format!("✓ {}: {}", t!("log.openuo_latest"), v), None);
+                                        self.logs.retain(|l| !matches!(l.action, Some(LogAction::UpdateOpenUO)));
                                     }
                                 } else {
                                     self.add_log(LogEntryType::Info, &format!("{}: {}", t!("log.openuo_not_installed"), v), Some(LogAction::UpdateOpenUO));
@@ -545,10 +553,11 @@ impl LauncherUi {
                         match res {
                             Ok(v) => {
                                 self.remote_launcher = Some(v.clone());
-                                if v != self.launcher_version {
+                                if version_newer(&v, &self.launcher_version) {
                                     self.add_log(LogEntryType::Info, &format!("{}: {}", t!("log.launcher_new_version"), v), Some(LogAction::UpdateLauncher));
                                 } else {
                                     self.add_log(LogEntryType::Success, &format!("✓ {}: {}", t!("log.launcher_latest"), v), None);
+                                    self.logs.retain(|l| !matches!(l.action, Some(LogAction::UpdateLauncher)));
                                 }
                             }
                             Err(e) => {
@@ -774,6 +783,20 @@ impl LauncherUi {
                         }
                     }
                 });
+            
+            // 单独展示一次下载进度条，避免每条日志下面都重复出现
+            if let (Some((cur, total)), Some(_)) = (self.download_progress, self.download_rx.as_ref()) {
+                if total > 0 {
+                    let progress = (cur as f32) / (total as f32);
+                    let total_mb = (total as f32) / (1024.0 * 1024.0);
+                    let cur_mb = (cur as f32) / (1024.0 * 1024.0);
+                    ui.add(
+                        egui::ProgressBar::new(progress)
+                            .text(format!("{:.1}/{:.1} MB", cur_mb, total_mb))
+                            .desired_width(max_width - 10.0)
+                    );
+                }
+            }
         });
     }
     
@@ -839,21 +862,6 @@ impl LauncherUi {
                 }
             }
         });
-        
-        // 显示下载进度条
-        if let Some((cur, total)) = self.download_progress {
-            if total > 0 {
-                let progress = (cur as f32) / (total as f32);
-                let total_mb = (total as f32) / (1024.0 * 1024.0);
-                let cur_mb = (cur as f32) / (1024.0 * 1024.0);
-                
-                ui.add(
-                    egui::ProgressBar::new(progress)
-                        .text(format!("{:.1}/{:.1} MB", cur_mb, total_mb))
-                        .desired_width(ui.available_width() - 30.0)
-                );
-            }
-        }
         
         ui.add_space(4.0);
     }
