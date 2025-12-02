@@ -3,7 +3,7 @@
 
 #define MyAppName "OpenUO Launcher"
 #define MyAppPublisher "OpenUO Contributors"
-#define MyAppURL "https://github.com/openuo-online/Another-OpenUO-Launcher"
+#define MyAppURL "https://github.com/openuo-online/OpenUO-Launcher"
 #define MyAppExeName "openuo-launcher.exe"
 
 ; 从 Cargo.toml 读取版本号（更可靠）

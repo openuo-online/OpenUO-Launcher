@@ -2,7 +2,7 @@ _version: 1
 
 # 窗口标题
 window:
-  title: Another OpenUO Launcher
+  title: OpenUO Launcher
 
 # 主界面
 main:

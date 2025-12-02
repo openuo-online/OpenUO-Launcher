@@ -10,7 +10,7 @@ fn main() {
         
         // 设置应用程序信息
         res.set("ProductName", "OpenUO Launcher");
-        res.set("FileDescription", "Another OpenUO Launcher");
+        res.set("FileDescription", "OpenUO Launcher");
         res.set("CompanyName", "OpenUO Contributors");
         res.set("LegalCopyright", "BSD-2-Clause License");
         

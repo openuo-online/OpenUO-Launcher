@@ -1,4 +1,4 @@
-# Another OpenUO Launcher
+# OpenUO Launcher
 
 [English](README.md) | 简体中文
 
@@ -19,7 +19,7 @@
 
 ## 📥 下载
 
-访问 [Releases](https://github.com/openuo-online/Another-OpenUO-Launcher/releases/latest) 下载最新版本
+访问 [Releases](https://github.com/openuo-online/OpenUO-Launcher/releases/latest) 下载最新版本
 
 ## 🚀 快速开始
 
@@ -32,8 +32,8 @@
 
 ```bash
 # 克隆项目
-git clone https://github.com/openuo-online/Another-OpenUO-Launcher.git
-cd Another-OpenUO-Launcher
+git clone https://github.com/openuo-online/OpenUO-Launcher.git
+cd OpenUO-Launcher
 
 # 运行
 cargo run
@@ -98,7 +98,7 @@ sudo pacman -S gtk3 libxcb libxkbcommon openssl
 
 ### 欢迎贡献
 
-如果你对这些功能感兴趣或有其他想法，欢迎提交 [Issue](https://github.com/openuo-online/Another-OpenUO-Launcher/issues) 讨论！
+如果你对这些功能感兴趣或有其他想法，欢迎提交 [Issue](https://github.com/openuo-online/OpenUO-Launcher/issues) 讨论！
 
 ## 📄 许可证
 

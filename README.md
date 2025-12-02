@@ -1,4 +1,4 @@
-# Another OpenUO Launcher
+# OpenUO Launcher
 
 English | [简体中文](README.zh-CN.md)
 
@@ -20,7 +20,7 @@ A modern OpenUO launcher written in Rust, with HiDPI display support and automat
 
 ## 📥 Download
 
-Visit [Releases](https://github.com/openuo-online/Another-OpenUO-Launcher/releases/latest) to download the latest version
+Visit [Releases](https://github.com/openuo-online/OpenUO-Launcher/releases/latest) to download the latest version
 
 ## 🚀 Quick Start
 
@@ -33,8 +33,8 @@ Visit [Releases](https://github.com/openuo-online/Another-OpenUO-Launcher/releas
 
 ```bash
 # Clone the repository
-git clone https://github.com/openuo-online/Another-OpenUO-Launcher.git
-cd Another-OpenUO-Launcher
+git clone https://github.com/openuo-online/OpenUO-Launcher.git
+cd OpenUO-Launcher
 
 # Run
 cargo run
@@ -99,7 +99,7 @@ Automatically detects screen resolution and scaling factor, passed to OpenUO:
 
 ### Contributions Welcome
 
-If you're interested in these features or have other ideas, feel free to submit an [Issue](https://github.com/openuo-online/Another-OpenUO-Launcher/issues) for discussion!
+If you're interested in these features or have other ideas, feel free to submit an [Issue](https://github.com/openuo-online/OpenUO-Launcher/issues) for discussion!
 
 ## 📄 License
 

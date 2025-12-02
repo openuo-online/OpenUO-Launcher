@@ -86,7 +86,7 @@ async fn run() -> Result<()> {
     let window_icon = load_window_icon();
     
     let mut window_builder = WindowBuilder::new()
-        .with_title("Another OpenUO Launcher")
+        .with_title("OpenUO Launcher")
         .with_inner_size(LogicalSize::new(960.0, 600.0))
         .with_min_inner_size(LogicalSize::new(720.0, 480.0));
     

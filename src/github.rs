@@ -11,7 +11,7 @@ use crate::config::open_uo_dir;
 const OPEN_UO_RELEASE_URL: &str =
     "https://api.github.com/repos/openuo-online/OpenUO/releases/latest";
 const LAUNCHER_RELEASE_URL: &str =
-    "https://api.github.com/repos/openuo-online/Another-OpenUO-Launcher/releases/latest";
+    "https://api.github.com/repos/openuo-online/OpenUO-Launcher/releases/latest";
 const OPEN_UO_VERSION_FILE: &str = ".open_uo_version";
 
 // 自定义更新源配置文件
@@ -162,7 +162,7 @@ fn use_github_format() -> bool {
 
 pub fn fetch_latest_release(url: &str) -> Result<GithubRelease> {
     let client = reqwest::blocking::Client::builder()
-        .user_agent("Another-OpenUO-Launcher")
+        .user_agent("OpenUO-Launcher")
         .timeout(Duration::from_secs(8))
         .build()?;
     
@@ -358,7 +358,7 @@ fn get_launcher_asset_name() -> String {
 
 fn download_asset(url: &str, dest: &PathBuf, progress: impl Fn(u64, u64)) -> Result<()> {
     let client = reqwest::blocking::Client::builder()
-        .user_agent("Another-OpenUO-Launcher")
+        .user_agent("OpenUO-Launcher")
         .timeout(Duration::from_secs(8))
         .build()?;
     let mut resp = client.get(url).send()?.error_for_status()?;

@@ -18,7 +18,7 @@
              Compressed="yes" 
              InstallScope="perUser" 
              Description="$(var.ProductName) Installer"
-             Comments="Another OpenUO Launcher" />
+             Comments="OpenUO Launcher" />
 
     <!-- 升级策略：自动卸载旧版本 -->
     <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
@@ -30,8 +30,8 @@
     <Property Id="ARPPRODUCTICON" Value="AppIcon" />
     
     <!-- 添加/删除程序中的信息 -->
-    <Property Id="ARPHELPLINK" Value="https://github.com/openuo-online/Another-OpenUO-Launcher" />
-    <Property Id="ARPURLINFOABOUT" Value="https://github.com/openuo-online/Another-OpenUO-Launcher" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/openuo-online/OpenUO-Launcher" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/openuo-online/OpenUO-Launcher" />
 
     <!-- 功能定义 -->
     <Feature Id="ProductFeature" Title="OpenUO Launcher" Level="1">
@@ -112,7 +112,7 @@
       <Component Id="ApplicationShortcutDesktop" Guid="5E6F7A8B-9C0D-1E2F-3A4B-5C6D7E8F9A0B">
         <Shortcut Id="DesktopShortcut"
                   Name="OpenUO Launcher"
-                  Description="Another OpenUO Launcher"
+                  Description="OpenUO Launcher"
                   Target="[INSTALLFOLDER]openuo-launcher.exe"
                   WorkingDirectory="INSTALLFOLDER"
                   Icon="AppIcon"
