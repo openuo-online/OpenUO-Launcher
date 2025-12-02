@@ -342,6 +342,26 @@ async fn run() -> Result<()> {
 }
 
 fn load_window_icon() -> Option<winit::window::Icon> {
+    #[cfg(target_os = "windows")]
+    {
+        // Windows 上优先使用 icon.ico
+        let icon_bytes = include_bytes!("../assets/icon.ico");
+        match image::load_from_memory(icon_bytes) {
+            Ok(img) => {
+                let rgba = img.to_rgba8();
+                let (width, height) = rgba.dimensions();
+                match winit::window::Icon::from_rgba(rgba.into_raw(), width, height) {
+                    Ok(icon) => {
+                        tracing::info!("{} (ico: {}x{})", i18n::t!("log.icon_loaded"), width, height);
+                        return Some(icon);
+                    }
+                    Err(e) => tracing::warn!("Failed to create icon from ico: {}", e),
+                }
+            }
+            Err(e) => tracing::warn!("Failed to load ico: {}", e),
+        }
+    }
+
     // 加载嵌入的图标（应为 256x256 或更小）
     let icon_bytes = include_bytes!("../assets/logo.png");
     
