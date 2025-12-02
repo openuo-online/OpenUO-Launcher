@@ -1,6 +1,8 @@
-/// 系统信息辅助模块
+use std::sync::OnceLock;
 
-/// 获取操作系统名称（简单版本）
+/// System info helpers.
+static SYSTEM_INFO: OnceLock<String> = OnceLock::new();
+
 pub fn os_name() -> String {
     #[cfg(target_os = "windows")]
     {
@@ -23,7 +25,6 @@ pub fn os_name() -> String {
     }
 }
 
-/// 获取操作系统名称和版本
 pub fn os_name_version() -> String {
     #[cfg(target_os = "windows")]
     {
@@ -46,30 +47,30 @@ pub fn os_name_version() -> String {
     }
 }
 
-/// 获取 CPU 架构
 pub fn arch() -> &'static str {
     std::env::consts::ARCH
 }
 
-/// 获取完整的系统信息字符串
+/// Cached system info string so we don't shell out every frame.
 pub fn system_info_string() -> String {
-    format!("{} {}", os_name_version(), arch())
+    SYSTEM_INFO
+        .get_or_init(|| format!("{} {}", os_name_version(), arch()))
+        .clone()
 }
 
 #[cfg(target_os = "windows")]
 fn get_windows_version() -> String {
-    // 尝试获取 Windows 版本
-    // 注意：在 Windows 10+ 上，可能需要特殊处理
+    use std::os::windows::process::CommandExt;
     use std::process::Command;
+    use windows::Win32::System::Threading::CREATE_NO_WINDOW;
     
     if let Ok(output) = Command::new("cmd")
+        .creation_flags(CREATE_NO_WINDOW.0)
         .args(&["/C", "ver"])
         .output()
     {
         if let Ok(version_str) = String::from_utf8(output.stdout) {
-            // 解析版本字符串
             if version_str.contains("Windows") {
-                // 简化版本显示
                 if version_str.contains("10.0") {
                     return "Windows 10/11".to_string();
                 }
@@ -84,7 +85,7 @@ fn get_windows_version() -> String {
 fn get_macos_version() -> String {
     use std::process::Command;
     
-    // 使用 sw_vers 获取 macOS 版本
+    // ʹ�� sw_vers ��ȡ macOS �汾
     if let Ok(output) = Command::new("sw_vers")
         .arg("-productVersion")
         .output()
@@ -92,7 +93,7 @@ fn get_macos_version() -> String {
         if output.status.success() {
             if let Ok(version) = String::from_utf8(output.stdout) {
                 let version = version.trim();
-                // 解析版本号，例如 "14.1.1" -> "macOS 14"
+                // �����汾�ţ����� "14.1.1" -> "macOS 14"
                 if let Some(major) = version.split('.').next() {
                     return format!("macOS {}", major);
                 }
