@@ -234,6 +234,11 @@ impl LauncherUi {
                             let selected = idx == self.config.active_profile;
                             if ui.selectable_label(selected, &profile.index.name).clicked() {
                                 self.config.active_profile = idx;
+                                // 保存上次选择的 profile
+                                self.config.launcher_settings.last_profile = Some(profile.index.file_name.clone());
+                                if let Err(e) = save_launcher_settings(&self.config.launcher_settings) {
+                                    tracing::warn!("Failed to save last profile: {}", e);
+                                }
                             }
                         }
                     });
@@ -639,6 +644,13 @@ impl LauncherUi {
         let Some(profile) = self.active_profile().cloned() else {
             anyhow::bail!("{}", t!("status.no_profile"));
         };
+        
+        // 保存上次启动的 profile
+        self.config.launcher_settings.last_profile = Some(profile.index.file_name.clone());
+        if let Err(e) = save_launcher_settings(&self.config.launcher_settings) {
+            tracing::warn!("Failed to save last profile: {}", e);
+        }
+        
         // 保存配置时带上屏幕信息
         self.save_config_with_screen_info()?;
         let settings_path = profile_settings_path(&profile);

@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 const PROFILES_DIR: &str = "Profiles";
 const SETTINGS_DIR: &str = "Profiles/Settings";
-const LAUNCHER_SETTINGS_FILENAME: &str = ".launcher_language";
+const LAUNCHER_SETTINGS_FILENAME: &str = ".launcher_settings";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LauncherConfig {
@@ -24,6 +24,8 @@ pub struct LauncherConfig {
 pub struct LauncherSettings {
     #[serde(rename = "language")]
     pub language: Option<String>,
+    #[serde(rename = "last_profile")]
+    pub last_profile: Option<String>,
 }
 
 impl Default for LauncherConfig {
@@ -40,6 +42,7 @@ impl Default for LauncherSettings {
     fn default() -> Self {
         Self {
             language: None,
+            last_profile: None,
         }
     }
 }
@@ -363,7 +366,15 @@ pub fn load_config_from_disk() -> LauncherConfig {
     }
     
     config.profiles = profiles;
+    
+    // 恢复上次选择的 profile
     config.active_profile = 0;
+    if let Some(last_profile_id) = &config.launcher_settings.last_profile {
+        if let Some(idx) = config.profiles.iter().position(|p| &p.index.file_name == last_profile_id) {
+            config.active_profile = idx;
+        }
+    }
+    
     config
 }
 
@@ -512,35 +523,25 @@ pub fn save_config(config: &LauncherConfig) -> Result<()> {
     Ok(())
 }
 
-/// 保存 Launcher 全局设置（只保存语言到简单文本文件）
+/// 保存 Launcher 全局设置（保存为 JSON 格式）
 pub fn save_launcher_settings(settings: &LauncherSettings) -> Result<()> {
     let settings_path = launcher_settings_path();
-    if let Some(lang) = &settings.language {
-        fs::write(&settings_path, lang)?;
-    } else {
-        // 如果语言为 None，删除文件
-        if settings_path.exists() {
-            fs::remove_file(&settings_path).ok();
-        }
-    }
+    let json = serde_json::to_string_pretty(settings)?;
+    fs::write(&settings_path, json)?;
     Ok(())
 }
 
-/// 加载 Launcher 全局设置（从简单文本文件读取语言）
+/// 加载 Launcher 全局设置（从 JSON 文件读取）
 pub fn load_launcher_settings() -> LauncherSettings {
     let settings_path = launcher_settings_path();
-    let language = if let Ok(content) = fs::read_to_string(&settings_path) {
-        let lang = content.trim().to_string();
-        if !lang.is_empty() {
-            Some(lang)
-        } else {
-            None
-        }
-    } else {
-        None
-    };
     
-    LauncherSettings { language }
+    if let Ok(content) = fs::read_to_string(&settings_path) {
+        if let Ok(settings) = serde_json::from_str::<LauncherSettings>(&content) {
+            return settings;
+        }
+    }
+    
+    LauncherSettings::default()
 }
 
 pub fn delete_profile(profile: &ProfileConfig) -> Result<()> {
