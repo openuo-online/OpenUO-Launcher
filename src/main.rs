@@ -342,50 +342,31 @@ async fn run() -> Result<()> {
 }
 
 fn load_window_icon() -> Option<winit::window::Icon> {
+    // 辅助函数：尝试从字节加载图标
+    let load_icon_from_bytes = |bytes: &[u8]| -> Option<winit::window::Icon> {
+        let img = image::load_from_memory(bytes).ok()?;
+        let rgba = img.to_rgba8();
+        let (width, height) = rgba.dimensions();
+        winit::window::Icon::from_rgba(rgba.into_raw(), width, height).ok()
+    };
+
+    // 1. Windows 上优先尝试 icon.ico
     #[cfg(target_os = "windows")]
     {
-        // Windows 上优先使用 icon.ico
-        let icon_bytes = include_bytes!("../assets/icon.ico");
-        match image::load_from_memory(icon_bytes) {
-            Ok(img) => {
-                let rgba = img.to_rgba8();
-                let (width, height) = rgba.dimensions();
-                match winit::window::Icon::from_rgba(rgba.into_raw(), width, height) {
-                    Ok(icon) => {
-                        tracing::info!("{} (ico: {}x{})", i18n::t!("log.icon_loaded"), width, height);
-                        return Some(icon);
-                    }
-                    Err(e) => tracing::warn!("Failed to create icon from ico: {}", e),
-                }
-            }
-            Err(e) => tracing::warn!("Failed to load ico: {}", e),
+        if let Some(icon) = load_icon_from_bytes(include_bytes!("../assets/icon.ico")) {
+            tracing::info!("{}", i18n::t!("log.icon_loaded"));
+            return Some(icon);
         }
     }
 
-    // 加载嵌入的图标（应为 256x256 或更小）
-    let icon_bytes = include_bytes!("../assets/logo.png");
-    
-    match image::load_from_memory(icon_bytes) {
-        Ok(img) => {
-            let rgba = img.to_rgba8();
-            let (width, height) = rgba.dimensions();
-            
-            match winit::window::Icon::from_rgba(rgba.into_raw(), width, height) {
-                Ok(icon) => {
-                    tracing::info!("{} ({}x{})", i18n::t!("log.icon_loaded"), width, height);
-                    Some(icon)
-                }
-                Err(_e) => {
-                    tracing::warn!("{}", i18n::t!("log.icon_create_failed"));
-                    None
-                }
-            }
-        }
-        Err(_e) => {
-            tracing::warn!("{}", i18n::t!("log.icon_load_failed"));
-            None
-        }
+    // 2. 其他情况（或 Windows 加载 ico 失败）使用 logo.png
+    if let Some(icon) = load_icon_from_bytes(include_bytes!("../assets/logo.png")) {
+        tracing::info!("{}", i18n::t!("log.icon_loaded"));
+        return Some(icon);
     }
+
+    tracing::warn!("{}", i18n::t!("log.icon_create_failed"));
+    None
 }
 
 fn install_cjk_font(ctx: &egui::Context) {
